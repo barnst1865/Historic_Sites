@@ -1,0 +1,65 @@
+[
+  {
+    "id": "1A47416F-DAA3-4137-9F30-14AF86B4E547",
+    "parkCode": "inde",
+    "fullName": "Independence National Historical Park",
+    "name": "Independence",
+    "states": "PA",
+    "latLong": "lat:39.94746, long:-75.14980",
+    "description": "The park that tells the story of the nation's founding. Home to Independence Hall, where the Declaration of Independence and the Constitution were created.",
+    "url": "https://www.nps.gov/inde/index.htm",
+    "operatingHours": [
+      {
+        "standardHours": {
+          "monday": "9:00AM - 5:00PM",
+          "tuesday": "9:00AM - 5:00PM",
+          "wednesday": "9:00AM - 5:00PM",
+          "thursday": "9:00AM - 5:00PM",
+          "friday": "9:00AM - 5:00PM",
+          "saturday": "9:00AM - 5:00PM",
+          "sunday": "9:00AM - 5:00PM"
+        }
+      }
+    ],
+    "entranceFees": [
+      {
+        "cost": "0.00",
+        "title": "Entrance Fee"
+      }
+    ]
+  },
+  {
+    "id": "65E0EB75-5C49-4351-AE6F-3BC069B523FE",
+    "parkCode": "gett",
+    "fullName": "Gettysburg National Military Park",
+    "name": "Gettysburg",
+    "states": "PA",
+    "latLong": "lat:39.81124, long:-77.22546",
+    "description": "The Battle of Gettysburg was a turning point in the Civil War, the Union victory that ended General Robert E. Lee's second and most ambitious invasion of the North.",
+    "url": "https://www.nps.gov/gett/index.htm",
+    "operatingHours": [],
+    "entranceFees": [
+      {
+        "cost": "0.00",
+        "title": "Entrance Fee"
+      }
+    ]
+  },
+  {
+    "id": "C5C0B331-23C3-4812-B51B-43A81A7C59B4",
+    "parkCode": "yell",
+    "fullName": "Yellowstone National Park",
+    "name": "Yellowstone",
+    "states": "WY,MT,ID",
+    "latLong": "lat:44.59824, long:-110.54780",
+    "description": "On March 1, 1872, Yellowstone became the first national park for all to enjoy the unique hydrothermal and geologic wonders.",
+    "url": "https://www.nps.gov/yell/index.htm",
+    "operatingHours": [],
+    "entranceFees": [
+      {
+        "cost": "35.00",
+        "title": "Private Vehicle"
+      }
+    ]
+  }
+]

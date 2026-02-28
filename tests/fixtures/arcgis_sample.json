@@ -1,0 +1,56 @@
+[
+  {
+    "attributes": {
+      "OBJECTID": 1,
+      "ResName": "Independence Hall",
+      "RefNum": "66000661",
+      "Address": "520 Chestnut St",
+      "City": "Philadelphia",
+      "County": "Philadelphia",
+      "State": "PA",
+      "CertDate": -307929600000,
+      "Status": "Listed",
+      "Is_NHL": "X"
+    },
+    "geometry": {
+      "x": -75.1500,
+      "y": 39.9489
+    }
+  },
+  {
+    "attributes": {
+      "OBJECTID": 2,
+      "ResName": "Gettysburg National Military Park",
+      "RefNum": "66000614",
+      "Address": "",
+      "City": "Gettysburg",
+      "County": "Adams",
+      "State": "PA",
+      "CertDate": -307929600000,
+      "Status": "Listed",
+      "Is_NHL": "X"
+    },
+    "geometry": {
+      "x": -77.2311,
+      "y": 39.8131
+    }
+  },
+  {
+    "attributes": {
+      "OBJECTID": 3,
+      "ResName": "Mount Vernon",
+      "RefNum": "66000834",
+      "Address": "3200 Mount Vernon Memorial Highway",
+      "City": "Mount Vernon",
+      "County": "Fairfax",
+      "State": "VA",
+      "CertDate": -307929600000,
+      "Status": "Listed",
+      "Is_NHL": "X"
+    },
+    "geometry": {
+      "x": -77.0861,
+      "y": 38.7070
+    }
+  }
+]
