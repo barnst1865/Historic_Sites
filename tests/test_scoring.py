@@ -4,7 +4,6 @@ import sqlite3
 
 import pytest
 
-from src.db.schema import create_tables, seed_categories
 from src.db.queries import (
     add_nrhp_area,
     add_nrhp_criterion,
@@ -12,6 +11,7 @@ from src.db.queries import (
     add_site_category,
     upsert_site,
 )
+from src.db.schema import create_tables, seed_categories
 from src.scoring.confidence import (
     _score_data_completeness,
     _score_description_richness,
@@ -22,7 +22,6 @@ from src.scoring.confidence import (
 )
 from src.scoring.review_queue import (
     approve_site,
-    get_review_queue,
     get_review_stats,
 )
 

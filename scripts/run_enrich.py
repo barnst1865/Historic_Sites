@@ -16,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import GEOPACKAGE_PATH
 from src.db.connection import db_connection
-from src.db.schema import create_database
 from src.enrich.batch_processor import run_enrichment
 
 logging.basicConfig(
@@ -33,7 +32,9 @@ def main():
     args = parser.parse_args()
 
     if not GEOPACKAGE_PATH.exists():
-        logger.error("Database not found. Run ingest first: python scripts/run_ingest.py --source nhl")
+        logger.error(
+            "Database not found. Run ingest first: python scripts/run_ingest.py --source nhl"
+        )
         sys.exit(1)
 
     with db_connection() as conn:

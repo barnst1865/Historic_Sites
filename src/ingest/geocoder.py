@@ -18,8 +18,8 @@ import sqlite3
 import time
 
 import requests
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut
 from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 from config.settings import (
     CENSUS_BATCH_SIZE,
@@ -28,10 +28,10 @@ from config.settings import (
     NOMINATIM_USER_AGENT,
 )
 from src.db.queries import (
-    get_sites_for_geocoding,
-    update_site,
-    start_pipeline_run,
     complete_pipeline_run,
+    get_sites_for_geocoding,
+    start_pipeline_run,
+    update_site,
 )
 from src.ingest.validator import validate_coordinates
 

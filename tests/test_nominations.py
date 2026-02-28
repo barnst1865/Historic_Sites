@@ -1,13 +1,11 @@
 """Tests for nomination fetcher and extractor."""
 
 import sqlite3
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 import pytest
 
-from src.db.schema import create_tables, seed_categories
 from src.db.queries import upsert_site
+from src.db.schema import create_tables, seed_categories
 from src.ingest.nomination_extractor import (
     NominationData,
     store_extraction,

@@ -11,7 +11,6 @@ Output: HTML report + JSON machine-readable report.
 import json
 import logging
 import sqlite3
-from collections import Counter
 from pathlib import Path
 
 from config.settings import OUTPUT_DIR
@@ -308,7 +307,10 @@ def save_html_report(profile: dict, filepath: Path | None = None) -> Path:
     # Build outlier rows
     outlier_rows = ""
     for o in outliers[:50]:
-        outlier_rows += f"<tr><td>{o['site_id']}</td><td>{o['name']}</td><td>{o['issue']}</td></tr>\n"
+        outlier_rows += (
+            f"<tr><td>{o['site_id']}</td><td>{o['name']}</td>"
+            f"<td>{o['issue']}</td></tr>\n"
+        )
 
     html = f"""<!DOCTYPE html>
 <html><head><title>Historic Sites Data Profile</title>

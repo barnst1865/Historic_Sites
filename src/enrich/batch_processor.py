@@ -13,18 +13,16 @@ import json
 import logging
 import sqlite3
 
-from tqdm import tqdm
-
 from config.settings import (
     ENRICHMENT_BATCH_SIZE_POOR,
     ENRICHMENT_BATCH_SIZE_RICH,
     ENRICHMENT_DESCRIPTION_RICH_THRESHOLD,
 )
 from src.db.queries import (
-    get_sites_for_enrichment,
-    update_site,
-    start_pipeline_run,
     complete_pipeline_run,
+    get_sites_for_enrichment,
+    start_pipeline_run,
+    update_site,
 )
 from src.enrich.claude_classifier import (
     classify_with_claude,

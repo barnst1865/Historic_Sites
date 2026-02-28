@@ -2,16 +2,15 @@
 
 import json
 import sqlite3
-from pathlib import Path
 
 import pytest
 
-from src.db.schema import create_tables, seed_categories
 from src.db.queries import add_designation, upsert_site
+from src.db.schema import create_tables, seed_categories
+from src.export.csv_exporter import export_full_csv, export_review_csv
+from src.export.folium_map import _popup_html, generate_map
+from src.export.geojson_exporter import _site_to_feature, export_all_sites, export_nhls
 from src.export.kml_exporter import export_by_state, export_master_kmz
-from src.export.geojson_exporter import export_all_sites, export_nhls, _site_to_feature
-from src.export.folium_map import generate_map, _popup_html
-from src.export.csv_exporter import export_review_csv, export_full_csv
 
 
 @pytest.fixture
@@ -59,7 +58,7 @@ def db_with_sites(db):
         "source": "test",
     })
 
-    s3 = upsert_site(db, {
+    upsert_site(db, {
         "name": "Mount Vernon",
         "nris_refnum": "66000834",
         "state": "VA",

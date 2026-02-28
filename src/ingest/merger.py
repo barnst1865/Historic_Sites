@@ -21,10 +21,9 @@ from src.db.queries import (
     add_nrhp_area,
     add_nrhp_criterion,
     add_site_source,
-    count_sites,
+    complete_pipeline_run,
     get_site_by_refnum,
     start_pipeline_run,
-    complete_pipeline_run,
     update_source_metadata,
     upsert_site,
 )

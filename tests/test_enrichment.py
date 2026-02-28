@@ -4,25 +4,24 @@ import sqlite3
 
 import pytest
 
-from src.db.schema import create_tables, seed_categories
 from src.db.queries import (
     add_nrhp_area,
-    add_nrhp_criterion,
     add_nrhp_period,
     upsert_site,
 )
+from src.db.schema import create_tables, seed_categories
+from src.enrich.batch_processor import _is_data_rich
 from src.enrich.claude_classifier import (
     derive_eras_from_periods,
     derive_events_from_areas,
     store_classifications,
 )
-from src.enrich.batch_processor import _is_data_rich
 from src.profiling.data_profiler import (
-    profile_completeness,
-    profile_description_richness,
-    profile_coordinate_coverage,
     detect_outliers,
     generate_profile,
+    profile_completeness,
+    profile_coordinate_coverage,
+    profile_description_richness,
 )
 
 

@@ -10,7 +10,6 @@ import sqlite3
 from pathlib import Path
 
 from config.categories import EVENT_NATURES, HISTORICAL_ERAS, OWNERSHIP_TYPES, SITE_TYPES
-from config.nrhp_taxonomy import AREAS_OF_SIGNIFICANCE
 from src.db.connection import db_connection
 
 # --- DDL Statements ---

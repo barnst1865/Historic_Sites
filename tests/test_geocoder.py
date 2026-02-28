@@ -1,12 +1,12 @@
 """Tests for geocoding pipeline."""
 
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.db.queries import get_site_by_id, upsert_site
 from src.db.schema import create_tables, seed_categories
-from src.db.queries import upsert_site, get_site_by_id
 from src.ingest.geocoder import (
     _build_census_batch,
     geocode_nominatim_single,
@@ -112,7 +112,9 @@ class TestRunGeocoding:
         db.commit()
 
         mock_census.return_value = {
-            site_id: {"lat": 39.9489, "lon": -75.15, "quality": "exact", "source": "census_geocoder"}
+            site_id: {
+                "lat": 39.9489, "lon": -75.15, "quality": "exact", "source": "census_geocoder",
+            }
         }
         mock_nominatim.return_value = None
 

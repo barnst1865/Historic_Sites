@@ -4,7 +4,6 @@ import sqlite3
 
 import pytest
 
-from src.db.schema import create_tables, seed_categories
 from src.db.queries import (
     add_designation,
     add_nrhp_area,
@@ -12,14 +11,15 @@ from src.db.queries import (
     add_nrhp_period,
     add_site_category,
     add_site_source,
+    complete_pipeline_run,
     count_sites,
     get_site_by_id,
     get_site_by_refnum,
-    upsert_site,
-    update_site,
     start_pipeline_run,
-    complete_pipeline_run,
+    update_site,
+    upsert_site,
 )
+from src.db.schema import create_tables, seed_categories
 
 
 @pytest.fixture

@@ -53,7 +53,8 @@ class NominationData(BaseModel):
     )
 
 
-EXTRACTION_PROMPT = """You are extracting structured data from a National Register of Historic Places / National Historic Landmark nomination document.
+EXTRACTION_PROMPT = """\
+You are extracting structured data from a National Register / National Historic Landmark nomination.
 
 Extract the following fields. Use the exact format specified:
 
@@ -141,8 +142,8 @@ def extract_with_ocr(pdf_path: Path) -> tuple[NominationData | None, str]:
         Tuple of (extracted data or None, extraction method string).
     """
     try:
-        from pdf2image import convert_from_path
         import pytesseract
+        from pdf2image import convert_from_path
     except ImportError as e:
         logger.warning("OCR dependencies not available: %s", e)
         return None, "ocr_deps_missing"

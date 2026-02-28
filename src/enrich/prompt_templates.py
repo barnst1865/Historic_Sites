@@ -7,7 +7,8 @@ Prompts are designed to:
   3. Assign rank (1=primary, 2=secondary, 3=tertiary) to each category
 """
 
-SYSTEM_PROMPT = """You are a historian and historic preservation specialist classifying US historic sites.
+SYSTEM_PROMPT = """\
+You are a historian and historic preservation specialist classifying US historic sites.
 
 You will receive site data that may include:
 - Official NRHP Areas of Significance and Criteria

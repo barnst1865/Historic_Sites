@@ -61,12 +61,11 @@ def main():
         logger.info("\n=== STAGE 1: INGEST ===")
 
         from src.ingest.arcgis_client import fetch_nhls, parse_features
-        from src.ingest.nps_parks_client import fetch_parks, parse_parks
         from src.ingest.merger import (
             merge_arcgis_records,
             merge_nps_parks_records,
-            merge_spreadsheet_records,
         )
+        from src.ingest.nps_parks_client import fetch_parks, parse_parks
         from src.ingest.validator import run_validation, save_validation_report
 
         # ArcGIS
@@ -110,7 +109,7 @@ def main():
 
         # --- Stage 6: Profile ---
         logger.info("\n=== STAGE 6: PROFILE ===")
-        from src.profiling.data_profiler import generate_profile, save_json_report, save_html_report
+        from src.profiling.data_profiler import generate_profile, save_html_report, save_json_report
 
         profile = generate_profile(conn)
         save_json_report(profile)
@@ -138,10 +137,10 @@ def main():
 
         # --- Stage 9: Export ---
         logger.info("\n=== STAGE 9: EXPORT ===")
-        from src.export.kml_exporter import export_kml
-        from src.export.geojson_exporter import export_geojson
+        from src.export.csv_exporter import export_full_csv, export_review_csv
         from src.export.folium_map import generate_map
-        from src.export.csv_exporter import export_review_csv, export_full_csv
+        from src.export.geojson_exporter import export_geojson
+        from src.export.kml_exporter import export_kml
 
         kml_result = export_kml(conn)
         logger.info("KML: %d state files, master KMZ created", len(kml_result["state_files"]))

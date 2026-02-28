@@ -10,7 +10,7 @@ import sqlite3
 import statistics
 
 from config.settings import SCORE_AUTO_APPROVE, SCORE_FLAG_REVIEW
-from src.db.queries import update_site, start_pipeline_run, complete_pipeline_run
+from src.db.queries import complete_pipeline_run, start_pipeline_run, update_site
 
 logger = logging.getLogger(__name__)
 

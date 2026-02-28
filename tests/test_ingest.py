@@ -8,16 +8,16 @@ import pytest
 
 from src.db.schema import create_tables, seed_categories
 from src.ingest.arcgis_client import parse_features
+from src.ingest.merger import merge_arcgis_records, merge_nps_parks_records
 from src.ingest.nps_parks_client import _parse_latlong, parse_parks
 from src.ingest.validator import (
+    find_fuzzy_matches,
     normalize_date,
     normalize_state,
+    run_validation,
     validate_coordinates,
     validate_site,
-    find_fuzzy_matches,
-    run_validation,
 )
-from src.ingest.merger import merge_arcgis_records, merge_nps_parks_records
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -187,7 +187,10 @@ class TestValidator:
 
     def test_fuzzy_match_with_suffix(self):
         existing = [
-            {"id": 1, "name": "Gettysburg National Military Park", "latitude": 39.81, "longitude": -77.23},
+            {
+                "id": 1, "name": "Gettysburg National Military Park",
+                "latitude": 39.81, "longitude": -77.23,
+            },
         ]
         matches = find_fuzzy_matches("Gettysburg", 39.81, -77.23, existing)
         assert len(matches) >= 1

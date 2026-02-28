@@ -91,7 +91,8 @@ def export_by_state(conn: sqlite3.Connection) -> list[Path]:
         # Split into chunks if over limit
         for chunk_idx in range(0, len(state_sites), MAX_POINTS_PER_FILE):
             chunk = state_sites[chunk_idx:chunk_idx + MAX_POINTS_PER_FILE]
-            suffix = f"_part{chunk_idx // MAX_POINTS_PER_FILE + 1}" if len(state_sites) > MAX_POINTS_PER_FILE else ""
+            needs_parts = len(state_sites) > MAX_POINTS_PER_FILE
+            suffix = f"_part{chunk_idx // MAX_POINTS_PER_FILE + 1}" if needs_parts else ""
             filename = f"historic_sites_{state}{suffix}.kml"
 
             kml = simplekml.Kml(name=f"Historic Sites — {state}{suffix}")
