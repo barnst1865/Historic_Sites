@@ -27,13 +27,25 @@ logger = logging.getLogger(__name__)
 CACHE_FILE = RAW_DIR / "arcgis_nhls.json"
 
 
-def _epoch_ms_to_iso(epoch_ms: int | None) -> str | None:
-    """Convert ArcGIS epoch milliseconds to ISO 8601 date string."""
-    if epoch_ms is None:
+def _epoch_ms_to_iso(value: int | str | None) -> str | None:
+    """Convert ArcGIS date value to ISO 8601 date string.
+
+    Handles epoch milliseconds (int) and date strings like '12/19/78'.
+    """
+    if value is None:
         return None
     try:
-        return time.strftime("%Y-%m-%d", time.gmtime(epoch_ms / 1000))
-    except (ValueError, OSError):
+        if isinstance(value, (int, float)):
+            return time.strftime("%Y-%m-%d", time.gmtime(value / 1000))
+        # Parse date strings like "12/19/78" or "01/03/2000"
+        parts = str(value).strip().split("/")
+        if len(parts) == 3:
+            month, day, year = int(parts[0]), int(parts[1]), int(parts[2])
+            if year < 100:
+                year += 1900 if year > 25 else 2000
+            return f"{year:04d}-{month:02d}-{day:02d}"
+        return None
+    except (ValueError, OSError, TypeError):
         return None
 
 
