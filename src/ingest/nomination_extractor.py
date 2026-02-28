@@ -1,7 +1,7 @@
 """
 Multi-strategy extraction of structured data from NHL nomination PDFs.
 
-Strategy 1: Send PDF directly to Claude API (native PDF reading)
+Strategy 1: Send PDF to Claude via CLI (native PDF reading)
 Strategy 2: OCR fallback via pytesseract for scanned documents
 Strategy 3: Flag for manual entry if both strategies fail
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from config.settings import ANTHROPIC_API_KEY
+from src.claude_cli import call_claude, call_claude_with_file
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ Rate your confidence based on document quality: 0.9+ for clear text,
 
 
 def extract_with_claude(pdf_path: Path) -> tuple[NominationData | None, str]:
-    """Extract nomination data using Claude's native PDF reading.
+    """Extract nomination data using Claude CLI's native PDF reading.
 
     Args:
         pdf_path: Path to the nomination PDF.
@@ -103,45 +103,12 @@ def extract_with_claude(pdf_path: Path) -> tuple[NominationData | None, str]:
     Returns:
         Tuple of (extracted data or None, extraction method string).
     """
-    if not ANTHROPIC_API_KEY:
-        logger.warning("ANTHROPIC_API_KEY not set. Cannot extract nominations.")
-        return None, "no_api_key"
-
-    import anthropic
-    import base64
-
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-        # Read PDF as base64
-        with open(pdf_path, "rb") as f:
-            pdf_data = base64.standard_b64encode(f.read()).decode("utf-8")
-
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": pdf_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": EXTRACTION_PROMPT,
-                        },
-                    ],
-                }
-            ],
+        response_text = call_claude_with_file(
+            str(pdf_path.resolve()), EXTRACTION_PROMPT
         )
-
-        response_text = message.content[0].text
+        if not response_text:
+            return None, "claude_pdf_failed"
 
         # Parse JSON from response
         json_start = response_text.find("{")
@@ -173,9 +140,6 @@ def extract_with_ocr(pdf_path: Path) -> tuple[NominationData | None, str]:
     Returns:
         Tuple of (extracted data or None, extraction method string).
     """
-    if not ANTHROPIC_API_KEY:
-        return None, "no_api_key"
-
     try:
         from pdf2image import convert_from_path
         import pytesseract
@@ -199,27 +163,18 @@ def extract_with_ocr(pdf_path: Path) -> tuple[NominationData | None, str]:
             logger.warning("OCR produced very little text for %s", pdf_path.name)
             return None, "ocr_insufficient_text"
 
-        # Send OCR text to Claude for structured extraction
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "The following text was extracted via OCR from a National Register "
-                        "nomination document. It may contain OCR errors.\n\n"
-                        f"--- OCR TEXT ---\n{ocr_text[:50000]}\n--- END ---\n\n"
-                        f"{EXTRACTION_PROMPT}"
-                    ),
-                }
-            ],
+        # Send OCR text to Claude CLI for structured extraction
+        ocr_prompt = (
+            "The following text was extracted via OCR from a National Register "
+            "nomination document. It may contain OCR errors.\n\n"
+            f"--- OCR TEXT ---\n{ocr_text[:50000]}\n--- END ---\n\n"
+            f"{EXTRACTION_PROMPT}"
         )
 
-        response_text = message.content[0].text
+        response_text = call_claude(ocr_prompt)
+        if not response_text:
+            return None, "ocr_failed"
+
         json_start = response_text.find("{")
         json_end = response_text.rfind("}") + 1
         if json_start >= 0 and json_end > json_start:

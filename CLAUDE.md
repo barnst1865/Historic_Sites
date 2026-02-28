@@ -19,7 +19,8 @@ This file provides guidance to Claude Code when working with this repository.
 ## Key Design Decisions
 - GeoPackage over plain SQLite for spatial query support (EPSG:4326)
 - Official NRHP taxonomy (Areas of Significance, Criteria A-D) captured first; AI enrichment layers on top
-- Multi-strategy PDF extraction: Claude native → OCR fallback → manual flag
+- Multi-strategy PDF extraction: Claude CLI → OCR fallback → manual flag
+- AI features use the `claude` CLI (Claude Code) instead of the Anthropic API SDK
 - Many-to-many categories with rank (1=primary, 2=secondary, 3=tertiary)
 - Sites can hold multiple designations (NHL + NRHP + State + Local simultaneously)
 

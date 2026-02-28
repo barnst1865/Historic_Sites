@@ -10,6 +10,7 @@ Comprehensive database of historic sites in the United States — federal (NHLs,
 
 ### Prerequisites
 - Python 3.11+
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (for AI enrichment and PDF extraction)
 - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) (for scanned PDF fallback)
 
 ### Installation
@@ -26,7 +27,7 @@ pip install -e ".[dev]"
 cp .env.example .env
 # Edit .env with your API keys:
 #   NPS_API_KEY     — free from https://www.nps.gov/developer/
-#   ANTHROPIC_API_KEY — for AI enrichment
+# AI enrichment uses the Claude Code CLI (no separate API key needed)
 ```
 
 ### Run the Pipeline

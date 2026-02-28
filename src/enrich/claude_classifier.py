@@ -10,7 +10,8 @@ import logging
 import sqlite3
 
 from config.categories import ERA_YEAR_RANGES, NRHP_TO_EVENT_NATURE
-from config.settings import ANTHROPIC_API_KEY, ENRICHMENT_MODEL
+from config.settings import ENRICHMENT_MODEL
+from src.claude_cli import call_claude
 from src.enrich.prompt_templates import CLASSIFICATION_PROMPT, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -110,12 +111,6 @@ def classify_with_claude(
     Returns:
         List of classification result dicts, or None on failure.
     """
-    if not ANTHROPIC_API_KEY:
-        logger.warning("ANTHROPIC_API_KEY not set. Skipping AI classification.")
-        return None
-
-    import anthropic
-
     # Build the prompt
     sites_json = json.dumps(sites_data, indent=2, default=str)
     derived_json = json.dumps(nrhp_derived or [], indent=2, default=str)
@@ -126,15 +121,9 @@ def classify_with_claude(
     )
 
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model=ENRICHMENT_MODEL,
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        response_text = message.content[0].text
+        response_text = call_claude(prompt, system_prompt=SYSTEM_PROMPT, model=ENRICHMENT_MODEL)
+        if not response_text:
+            return None
 
         # Extract JSON array from response
         json_start = response_text.find("[")

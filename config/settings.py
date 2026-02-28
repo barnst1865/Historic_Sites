@@ -23,7 +23,6 @@ for d in [RAW_DIR, NOMINATIONS_DIR, OUTPUT_DIR]:
 
 # --- API Keys ---
 NPS_API_KEY = os.getenv("NPS_API_KEY", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # --- ArcGIS REST API ---
 # NRHP spatial data service — Layer 0 is point locations
@@ -55,8 +54,9 @@ CENSUS_BATCH_SIZE = 10000  # Max addresses per batch
 NOMINATIM_USER_AGENT = "HistoricSitesDB/0.1 (research project)"
 NOMINATIM_RATE_LIMIT = 1.0  # seconds between requests
 
-# --- AI Enrichment ---
-ENRICHMENT_MODEL = "claude-sonnet-4-20250514"
+# --- AI Enrichment (via Claude Code CLI) ---
+ENRICHMENT_MODEL = "sonnet"
+CLAUDE_CLI_TIMEOUT = 120  # seconds for subprocess timeout
 ENRICHMENT_BATCH_SIZE_RICH = 10  # Sites per call for data-rich records
 ENRICHMENT_BATCH_SIZE_POOR = 1  # Sites per call for data-poor records
 ENRICHMENT_DESCRIPTION_RICH_THRESHOLD = 50  # Words for "data-rich" cutoff
