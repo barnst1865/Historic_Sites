@@ -108,6 +108,19 @@ def fetch_nhls(use_cache: bool = True) -> list[dict]:
     return all_features
 
 
+def _get_attr(attrs: dict, *keys: str) -> str | None:
+    """Get the first non-empty value from a list of attribute key aliases.
+
+    ArcGIS field names vary across API versions (e.g. ResName vs RESNAME,
+    RefNum vs NRIS_Refnum). This helper tries each alias in order.
+    """
+    for key in keys:
+        val = attrs.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return None
+
+
 def parse_features(features: list[dict]) -> list[dict]:
     """Transform raw ArcGIS features into site records matching our schema.
 
@@ -128,21 +141,24 @@ def parse_features(features: list[dict]) -> list[dict]:
 
         # Skip features with null geometry
         if longitude is None or latitude is None:
-            logger.warning("Skipping feature with no geometry: %s", attrs.get("ResName"))
+            logger.warning("Skipping feature with no geometry: %s",
+                           _get_attr(attrs, "ResName", "RESNAME"))
             continue
 
         site = {
-            "nris_refnum": str(attrs.get("RefNum", "")).strip() or None,
-            "name": (attrs.get("ResName") or "").strip(),
-            "address": (attrs.get("Address") or "").strip() or None,
-            "city": (attrs.get("City") or "").strip() or None,
-            "county": (attrs.get("County") or "").strip() or None,
-            "state": (attrs.get("State") or "").strip() or None,
+            "nris_refnum": _get_attr(attrs, "RefNum", "NRIS_Refnum", "PROPERTY_ID"),
+            "name": _get_attr(attrs, "ResName", "RESNAME") or "",
+            "address": _get_attr(attrs, "Address"),
+            "city": _get_attr(attrs, "City"),
+            "county": _get_attr(attrs, "County"),
+            "state": _get_attr(attrs, "State"),
             "latitude": latitude,
             "longitude": longitude,
             "coordinates_source": "arcgis",
-            "nrhp_cert_date": _epoch_ms_to_iso(attrs.get("CertDate")),
-            "nrhp_status": (attrs.get("Status") or "").strip() or None,
+            "nrhp_cert_date": _epoch_ms_to_iso(
+                attrs.get("CertDate") or attrs.get("CERTDATE")
+            ),
+            "nrhp_status": _get_attr(attrs, "Status", "STATUS"),
             "source_arcgis": True,
             "primary_source": "arcgis",
         }

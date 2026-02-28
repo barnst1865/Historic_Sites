@@ -60,15 +60,35 @@ def main():
         # --- Stage 1: Ingest ---
         logger.info("\n=== STAGE 1: INGEST ===")
 
+        from config.settings import RAW_DIR
         from src.ingest.arcgis_client import fetch_nhls, parse_features
         from src.ingest.merger import (
             merge_arcgis_records,
             merge_nps_parks_records,
+            merge_spreadsheet_records,
         )
         from src.ingest.nps_parks_client import fetch_parks, parse_parks
+        from src.ingest.spreadsheet_loader import load_spreadsheet
         from src.ingest.validator import run_validation, save_validation_report
 
-        # ArcGIS
+        # Spreadsheet (authoritative NHL list)
+        logger.info("--- NHL Spreadsheet ---")
+        spreadsheet_stats = {"inserted": 0, "updated": 0, "skipped": 0}
+        candidates = (
+            list(RAW_DIR.glob("*NHL*.*"))
+            + list(RAW_DIR.glob("*nhl*.*"))
+            + list(RAW_DIR.glob("*Landmark*.*"))
+            + list(RAW_DIR.glob("*landmark*.*"))
+        )
+        xlsx_files = list({f for f in candidates if f.suffix in (".xlsx", ".xls", ".csv")})
+        if xlsx_files:
+            records = load_spreadsheet(xlsx_files[0], is_nhl=True)
+            spreadsheet_stats = merge_spreadsheet_records(conn, records)
+            logger.info("Spreadsheet merge: %s", spreadsheet_stats)
+        else:
+            logger.warning("No NHL spreadsheet in %s — skipping", RAW_DIR)
+
+        # ArcGIS (coordinates overlay)
         logger.info("--- ArcGIS NHLs ---")
         features = fetch_nhls(use_cache=not args.no_cache)
         arcgis_sites = parse_features(features)
