@@ -32,7 +32,10 @@ from src.db.schema import create_database
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
 )
+# Force unbuffered output so progress messages appear immediately
+sys.stdout.reconfigure(line_buffering=True)
 logger = logging.getLogger(__name__)
 
 
