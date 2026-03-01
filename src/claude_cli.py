@@ -41,7 +41,6 @@ def call_claude(
         "-p",
         "--model", model,
         "--output-format", "text",
-        "--tools", "",
     ]
 
     return _run_cli(cmd, full_prompt, timeout)
@@ -96,6 +95,8 @@ def _run_cli(cmd: list[str], prompt: str, timeout: int | None) -> str | None:
     # Build a clean environment — remove CLAUDECODE so the CLI runs normally
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
+    logger.debug("Calling Claude CLI (cmd=%s, timeout=%ds)", " ".join(cmd[:6]), timeout)
+
     try:
         result = subprocess.run(
             cmd,
@@ -117,7 +118,11 @@ def _run_cli(cmd: list[str], prompt: str, timeout: int | None) -> str | None:
         return result.stdout.strip()
 
     except subprocess.TimeoutExpired:
-        logger.warning("Claude CLI timed out after %ds", timeout)
+        logger.warning(
+            "Claude CLI timed out after %ds (prompt length: %d chars)",
+            timeout,
+            len(prompt),
+        )
         return None
     except FileNotFoundError:
         logger.error(
@@ -125,5 +130,5 @@ def _run_cli(cmd: list[str], prompt: str, timeout: int | None) -> str | None:
         )
         return None
     except Exception as e:
-        logger.warning("Claude CLI call failed: %s", e)
+        logger.warning("Claude CLI call failed: %s: %s", type(e).__name__, e)
         return None

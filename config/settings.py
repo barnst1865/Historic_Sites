@@ -60,6 +60,7 @@ CLAUDE_CLI_TIMEOUT = 120  # seconds for subprocess timeout
 ENRICHMENT_BATCH_SIZE_RICH = 10  # Sites per call for data-rich records
 ENRICHMENT_BATCH_SIZE_POOR = 1  # Sites per call for data-poor records
 ENRICHMENT_DESCRIPTION_RICH_THRESHOLD = 50  # Words for "data-rich" cutoff
+ENRICHMENT_MAX_CONSECUTIVE_FAILURES = 5  # Abort after N consecutive AI failures
 
 # --- Confidence Scoring Thresholds ---
 SCORE_AUTO_APPROVE = 0.8

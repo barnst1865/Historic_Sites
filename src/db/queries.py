@@ -308,6 +308,18 @@ def complete_pipeline_run(
     )
 
 
+def update_pipeline_run_progress(
+    conn: sqlite3.Connection,
+    run_id: int,
+    records_processed: int,
+) -> None:
+    """Update records_processed for a running pipeline without changing status."""
+    conn.execute(
+        "UPDATE pipeline_runs SET records_processed = ? WHERE id = ?",
+        (records_processed, run_id),
+    )
+
+
 def update_source_metadata(
     conn: sqlite3.Connection,
     source_name: str,
