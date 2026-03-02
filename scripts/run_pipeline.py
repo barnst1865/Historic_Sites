@@ -43,6 +43,9 @@ def main():
     parser = argparse.ArgumentParser(description="Run full historic sites pipeline")
     parser.add_argument("--skip-enrich", action="store_true", help="Skip AI enrichment")
     parser.add_argument("--skip-nominations", action="store_true", help="Skip nomination PDFs")
+    parser.add_argument("--skip-shpo", action="store_true", help="Skip state SHPO ingest")
+    parser.add_argument("--shpo-states", type=str, default=None,
+                        help="Comma-separated state codes for SHPO (e.g., IN,MO,UT)")
     parser.add_argument("--enrich-limit", type=int, help="Limit enrichment batch size")
     parser.add_argument("--no-cache", action="store_true", help="Force fresh API fetches")
     args = parser.parse_args()
@@ -111,6 +114,36 @@ def main():
             nps_sites = parse_parks(parks)
             nps_stats = merge_nps_parks_records(conn, nps_sites)
             logger.info("NPS Parks merge: %s", nps_stats)
+
+        # SHPO State Sources
+        if not args.skip_shpo:
+            logger.info("--- SHPO State Sources ---")
+            from config.state_sources import STATE_SOURCES
+            from src.ingest.merger import merge_shpo_records
+            from src.ingest.shpo_dispatcher import (
+                fetch_state,
+                get_active_states,
+                parse_state,
+            )
+
+            shpo_state_list = (
+                args.shpo_states.split(",") if args.shpo_states else None
+            )
+            active_states = get_active_states(filter_states=shpo_state_list)
+            for state_code in active_states:
+                try:
+                    logger.info("--- SHPO %s ---", state_code)
+                    raw = fetch_state(state_code, use_cache=not args.no_cache)
+                    sites = parse_state(state_code, raw)
+                    shpo_config = STATE_SOURCES[state_code]
+                    shpo_stats = merge_shpo_records(conn, sites, state_code, shpo_config)
+                    logger.info("SHPO %s merge: %s", state_code, shpo_stats)
+                except Exception:
+                    logger.exception(
+                        "SHPO %s failed — continuing with next state", state_code
+                    )
+        else:
+            logger.info("--- SHPO State Sources (SKIPPED) ---")
 
         total = conn.execute("SELECT COUNT(*) FROM sites").fetchone()[0]
         with_coords = conn.execute(

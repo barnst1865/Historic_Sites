@@ -15,7 +15,7 @@ Key behaviors:
 import logging
 import sqlite3
 
-from config.settings import FIELD_PRIORITY
+from config.settings import FIELD_PRIORITY, FUZZY_MATCH_CANDIDATE, FUZZY_MATCH_THRESHOLD
 from src.db.queries import (
     add_designation,
     add_nrhp_area,
@@ -233,5 +233,148 @@ def merge_nps_parks_records(
     conn.commit()
     update_source_metadata(conn, source_name, sum(stats.values()) - stats["skipped"])
     complete_pipeline_run(conn, run_id, sum(stats.values()))
+    logger.info("Merge %s: %s", source_name, stats)
+    return stats
+
+
+def merge_shpo_records(
+    conn: sqlite3.Connection,
+    sites: list[dict],
+    state_code: str,
+    config: dict,
+) -> dict:
+    """Merge SHPO state records into the database.
+
+    Three-pass matching:
+      1. NRIS refnum match (if record has nris_refnum)
+      2. Fuzzy name + geographic proximity match (scoped to same state)
+      3. Insert as new record
+
+    Matched sites get source_shpo=1 and NULL fields filled via COALESCE.
+    Federal data is never overwritten. Designations are always added (additive).
+
+    Returns:
+        Dict with 'inserted', 'updated', 'matched_nris', 'matched_fuzzy', 'skipped' counts.
+    """
+    source_name = f"shpo_{state_code.lower()}"
+    run_id = start_pipeline_run(conn, f"merge_{source_name}")
+    stats = {
+        "inserted": 0,
+        "updated": 0,
+        "matched_nris": 0,
+        "matched_fuzzy": 0,
+        "skipped": 0,
+    }
+
+    # Load existing sites in this state for fuzzy matching
+    existing = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT id, name, latitude, longitude FROM sites WHERE state = ?",
+            (state_code,),
+        ).fetchall()
+    ]
+
+    for site_data in sites:
+        result = validate_site(site_data)
+        site_data = result["site_data"]
+
+        site_id = None
+
+        # Pass 1: NRIS refnum match
+        refnum = site_data.get("nris_refnum")
+        if refnum:
+            existing_site = get_site_by_refnum(conn, refnum)
+            if existing_site:
+                site_id = existing_site["id"]
+                stats["matched_nris"] += 1
+
+        # Pass 2: Fuzzy name + proximity match
+        if site_id is None:
+            matches = find_fuzzy_matches(
+                site_data.get("name", ""),
+                site_data.get("latitude"),
+                site_data.get("longitude"),
+                existing,
+            )
+            if matches and matches[0]["score"] >= FUZZY_MATCH_THRESHOLD:
+                site_id = matches[0]["site_id"]
+                stats["matched_fuzzy"] += 1
+            elif matches and matches[0]["score"] >= FUZZY_MATCH_CANDIDATE:
+                logger.info(
+                    "[SHPO] %s: Candidate match (score=%d): '%s' ~ '%s'",
+                    state_code,
+                    matches[0]["score"],
+                    site_data.get("name"),
+                    matches[0]["name"],
+                )
+
+        # Update matched site or insert new
+        if site_id is not None:
+            # Fill NULL fields — never overwrite existing federal data
+            update_fields = {}
+            for field in (
+                "address", "city", "county", "date_constructed",
+                "state_designation_date",
+            ):
+                if site_data.get(field):
+                    update_fields[field] = site_data[field]
+
+            update_fields["source_shpo"] = True
+
+            if update_fields:
+                # COALESCE: only fill fields that are currently NULL or empty
+                set_parts = []
+                values = []
+                for k, v in update_fields.items():
+                    if k == "source_shpo":
+                        set_parts.append(f"{k} = ?")
+                    else:
+                        set_parts.append(f"{k} = COALESCE(NULLIF({k}, ''), ?)")
+                    values.append(v)
+                values.append(site_id)
+                conn.execute(
+                    f"UPDATE sites SET {', '.join(set_parts)} WHERE id = ? "
+                    "AND primary_source != 'manual'",
+                    values,
+                )
+            stats["updated"] += 1
+        else:
+            # Pass 3: Insert as new record
+            # Remove state_record_id before insert (not a sites table column)
+            insert_data = {
+                k: v for k, v in site_data.items() if k != "state_record_id"
+            }
+            site_id = upsert_site(conn, insert_data)
+            stats["inserted"] += 1
+
+            # Add to existing list for subsequent fuzzy matching
+            existing.append({
+                "id": site_id,
+                "name": site_data.get("name", ""),
+                "latitude": site_data.get("latitude"),
+                "longitude": site_data.get("longitude"),
+            })
+
+        # Always add designation (INSERT OR IGNORE — additive)
+        for desig_type in config.get("designation_types", ["State Register"]):
+            add_designation(conn, site_id, {
+                "designation_type": desig_type,
+                "designation_date": site_data.get("state_designation_date"),
+                "designating_authority": config.get("designating_authority"),
+                "source": source_name,
+            })
+
+        # Track provenance
+        add_site_source(conn, site_id, {
+            "source_name": source_name,
+            "source_record_id": site_data.get("state_record_id") or refnum,
+            "raw_data": site_data,
+        })
+
+    conn.commit()
+    total_processed = sum(stats.values())
+    update_source_metadata(conn, source_name, total_processed - stats["skipped"])
+    complete_pipeline_run(conn, run_id, total_processed)
     logger.info("Merge %s: %s", source_name, stats)
     return stats

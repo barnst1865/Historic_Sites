@@ -1,0 +1,56 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "objectid": 8,
+        "shaard_id": "041-076-27050",
+        "historicname": "Conner Prairie Farmhouse",
+        "rating": "Contributing",
+        "globalid": "{1EA00BD9-3AE0-46E3-8CB8-EC8F14559D90}"
+      },
+      "geometry": {
+        "x": -86.0052,
+        "y": 39.9956
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 15,
+        "shaard_id": "049-123-45001",
+        "historicname": "West Baden Springs Hotel",
+        "rating": "Outstanding",
+        "globalid": "{2FA10CD0-4BF1-57F4-9DC9-FD9G25660E01}"
+      },
+      "geometry": {
+        "x": -86.6178,
+        "y": 38.5667
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 22,
+        "shaard_id": "097-200-11003",
+        "historicname": "",
+        "rating": "Non-Contributing",
+        "globalid": "{3GB21DE1-5CG2-68G5-AED0-GE0H36771F12}"
+      },
+      "geometry": {
+        "x": -85.75,
+        "y": 40.10
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 30,
+        "shaard_id": "018-050-99010",
+        "historicname": "Indiana Governor's Mansion",
+        "rating": "Contributing",
+        "globalid": "{4HC32EF2-6DH3-79H6-BFE1-HF1I47882G23}"
+      },
+      "geometry": null
+    }
+  ],
+  "exceededTransferLimit": false,
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {"wkid": 4326, "latestWkid": 4326}
+}

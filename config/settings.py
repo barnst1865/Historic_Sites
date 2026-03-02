@@ -110,14 +110,20 @@ DATA_SOURCES = {
         "active": True,
         "priority": 1,  # Authoritative for NRHP classification
     },
+    "shpo": {
+        "name": "State SHPO Data",
+        "description": "State Historic Preservation Office ArcGIS/CSV/custom sources",
+        "active": True,
+        "priority": 4,  # State-level, after federal
+    },
 }
 
 # --- Field Priority ---
 # When merging, which source wins for each field group (lower number = higher priority)
 FIELD_PRIORITY = {
-    "coordinates": ["arcgis", "nps_parks", "nominations"],
-    "name": ["nhl_spreadsheet", "arcgis", "nps_parks"],
-    "description": ["nominations", "nps_parks", "arcgis", "nhl_spreadsheet"],
+    "coordinates": ["arcgis", "nps_parks", "shpo", "nominations"],
+    "name": ["nhl_spreadsheet", "arcgis", "nps_parks", "shpo"],
+    "description": ["nominations", "nps_parks", "arcgis", "nhl_spreadsheet", "shpo"],
     "nrhp_classification": ["nominations", "nhl_spreadsheet"],
-    "dates": ["nhl_spreadsheet", "arcgis"],
+    "dates": ["nhl_spreadsheet", "arcgis", "shpo"],
 }

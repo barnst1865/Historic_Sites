@@ -7,6 +7,8 @@ Usage:
     python scripts/run_ingest.py --source spreadsheet   # Spreadsheet only
     python scripts/run_ingest.py --source nps_parks     # NPS Parks API
     python scripts/run_ingest.py --source nominations   # Nomination PDFs
+    python scripts/run_ingest.py --source shpo          # State SHPO sources
+    python scripts/run_ingest.py --source shpo --states IN,MO  # Specific states
     python scripts/run_ingest.py --source all           # All active sources
 """
 
@@ -25,9 +27,11 @@ from src.ingest.arcgis_client import fetch_nhls, parse_features
 from src.ingest.merger import (
     merge_arcgis_records,
     merge_nps_parks_records,
+    merge_shpo_records,
     merge_spreadsheet_records,
 )
 from src.ingest.nps_parks_client import fetch_parks, parse_parks
+from src.ingest.shpo_dispatcher import fetch_state, get_active_states, parse_state
 from src.ingest.validator import run_validation, save_validation_report
 
 logging.basicConfig(
@@ -92,15 +96,51 @@ def ingest_nps_parks(conn, no_cache: bool = False):
     return stats
 
 
+def ingest_shpo(conn, states: list[str] | None = None, no_cache: bool = False):
+    """Ingest records from state SHPO data sources."""
+    from config.state_sources import STATE_SOURCES
+
+    active = get_active_states(filter_states=states)
+    if not active:
+        logger.warning("No active SHPO states to ingest")
+        return {}
+
+    logger.info("=== Ingesting SHPO: %s ===", ", ".join(active))
+    all_stats = {}
+
+    for state_code in active:
+        try:
+            logger.info("--- SHPO %s ---", state_code)
+            raw = fetch_state(state_code, use_cache=not no_cache)
+            sites = parse_state(state_code, raw)
+
+            config = STATE_SOURCES[state_code]
+            stats = merge_shpo_records(conn, sites, state_code, config)
+            all_stats[state_code] = stats
+            logger.info("SHPO %s merge: %s", state_code, stats)
+        except Exception:
+            logger.exception("SHPO %s failed — continuing with next state", state_code)
+            all_stats[state_code] = {"error": True}
+
+    return all_stats
+
+
 def main():
     parser = argparse.ArgumentParser(description="Ingest historic site data")
     parser.add_argument(
         "--source",
-        choices=["nhl", "arcgis", "spreadsheet", "nps_parks", "nominations", "nrhp", "all"],
+        choices=[
+            "nhl", "arcgis", "spreadsheet", "nps_parks",
+            "nominations", "nrhp", "shpo", "all",
+        ],
         required=True,
         help="Data source to ingest",
     )
     parser.add_argument("--file", type=Path, help="Path to spreadsheet file")
+    parser.add_argument(
+        "--states", type=str, default=None,
+        help="Comma-separated state codes for SHPO ingest (e.g., IN,MO,UT)",
+    )
     parser.add_argument("--no-cache", action="store_true", help="Force fresh API fetch")
     args = parser.parse_args()
 
@@ -109,6 +149,8 @@ def main():
         logger.info("Creating database at %s", GEOPACKAGE_PATH)
         create_database()
 
+    state_list = args.states.split(",") if args.states else None
+
     with db_connection() as conn:
         if args.source == "arcgis":
             ingest_arcgis(conn, no_cache=args.no_cache)
@@ -116,6 +158,8 @@ def main():
             ingest_spreadsheet(conn, filepath=args.file)
         elif args.source == "nps_parks":
             ingest_nps_parks(conn, no_cache=args.no_cache)
+        elif args.source == "shpo":
+            ingest_shpo(conn, states=state_list, no_cache=args.no_cache)
         elif args.source == "nhl":
             # NHL = spreadsheet first (authoritative), then ArcGIS overlay
             ingest_spreadsheet(conn, filepath=args.file)
@@ -124,6 +168,7 @@ def main():
             ingest_spreadsheet(conn, filepath=args.file)
             ingest_arcgis(conn, no_cache=args.no_cache)
             ingest_nps_parks(conn, no_cache=args.no_cache)
+            ingest_shpo(conn, states=state_list, no_cache=args.no_cache)
         elif args.source == "nominations":
             logger.info("Nomination ingestion — see run_ingest.py --source nominations")
             # Will be implemented in Phase 3

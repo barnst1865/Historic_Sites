@@ -1,0 +1,76 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "objectid": 1,
+        "propertyname": "Beehive House",
+        "historicpropertyname": "Beehive House",
+        "housenumber": 67,
+        "streetdirection": "E",
+        "streetname": "SOUTH TEMPLE",
+        "cityname": "SALT LAKE CITY",
+        "countyname": "SALT LAKE COUNTY",
+        "constructionyear1": "1854",
+        "nrisnumber": "66000740",
+        "nrlisteddate": -62125920000,
+        "evaluationname": "NATIONAL REGISTER",
+        "evaluationcode": "1S",
+        "pr_id": 100001,
+        "style": "MID 19TH C.: GOTHIC REVIVAL"
+      },
+      "geometry": {
+        "x": -111.8890,
+        "y": 40.7700
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 2,
+        "propertyname": null,
+        "historicpropertyname": "Old Deseret Mercantile",
+        "housenumber": 250,
+        "streetdirection": "S",
+        "streetname": "MAIN STREET",
+        "cityname": "PROVO",
+        "countyname": "UTAH COUNTY",
+        "constructionyear1": "1890",
+        "nrisnumber": null,
+        "nrlisteddate": null,
+        "evaluationname": "ELIGIBLE",
+        "evaluationcode": "B",
+        "pr_id": 100002,
+        "style": "LATE VICTORIAN: ROMANESQUE"
+      },
+      "geometry": {
+        "x": -111.6585,
+        "y": 40.2338
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 3,
+        "propertyname": null,
+        "historicpropertyname": null,
+        "housenumber": null,
+        "streetdirection": null,
+        "streetname": null,
+        "cityname": "MOAB",
+        "countyname": "GRAND COUNTY",
+        "constructionyear1": null,
+        "nrisnumber": null,
+        "nrlisteddate": null,
+        "evaluationname": "INELIG./NON-CONTRIBUTING",
+        "evaluationcode": "C",
+        "pr_id": 100003,
+        "style": null
+      },
+      "geometry": {
+        "x": -109.5498,
+        "y": 38.5733
+      }
+    }
+  ],
+  "exceededTransferLimit": false,
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {"wkid": 4326, "latestWkid": 4326}
+}

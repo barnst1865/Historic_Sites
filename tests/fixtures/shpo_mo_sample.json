@@ -1,0 +1,82 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "HST_NAME": "Neosho High School",
+        "OTHR_NAME": "Neosho Intermediate School",
+        "MPS_MRA": "Historic Resources of Neosho MPS",
+        "COMMENT_": " ",
+        "PERIOD_SIG": " ",
+        "ARCHITECT": " ",
+        "PADDRESS": "West McCord and North Wood Streets",
+        "PLOCALNAME": "Neosho",
+        "DATE_LIST": 1030683600000,
+        "CRITERIA_A": "N",
+        "CRITERIA_B": "N",
+        "CRITERIA_C": "Y",
+        "CRITERIA_D": "N",
+        "AS_ARCHIT": "Y",
+        "AS_EDUCATN": "Y",
+        "AS_AGRI": "N",
+        "SHPO_NUMBE": "NW001",
+        "OBJECTID": 128870
+      },
+      "geometry": {
+        "x": -94.368968,
+        "y": 36.871334
+      }
+    },
+    {
+      "attributes": {
+        "HST_NAME": "Mark Twain Boyhood Home",
+        "OTHR_NAME": " ",
+        "MPS_MRA": " ",
+        "COMMENT_": " ",
+        "PERIOD_SIG": "1844-1853",
+        "ARCHITECT": " ",
+        "PADDRESS": "206 Hill Street",
+        "PLOCALNAME": "Hannibal",
+        "DATE_LIST": -62125920000,
+        "CRITERIA_A": "Y",
+        "CRITERIA_B": "Y",
+        "CRITERIA_C": "N",
+        "CRITERIA_D": "N",
+        "AS_ARCHIT": "N",
+        "AS_LITER": "Y",
+        "AS_AGRI": "N",
+        "SHPO_NUMBE": "MR001",
+        "OBJECTID": 100200
+      },
+      "geometry": {
+        "x": -91.3585,
+        "y": 39.7103
+      }
+    },
+    {
+      "attributes": {
+        "HST_NAME": "",
+        "OTHR_NAME": " ",
+        "MPS_MRA": " ",
+        "COMMENT_": " ",
+        "PERIOD_SIG": " ",
+        "ARCHITECT": " ",
+        "PADDRESS": "123 Main St",
+        "PLOCALNAME": "Springfield",
+        "DATE_LIST": null,
+        "CRITERIA_A": "N",
+        "CRITERIA_B": "N",
+        "CRITERIA_C": "N",
+        "CRITERIA_D": "N",
+        "SHPO_NUMBE": "GR050",
+        "OBJECTID": 200300
+      },
+      "geometry": {
+        "x": -93.2923,
+        "y": 37.2090
+      }
+    }
+  ],
+  "exceededTransferLimit": false,
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {"wkid": 4326, "latestWkid": 4326}
+}
