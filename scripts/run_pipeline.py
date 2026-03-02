@@ -47,6 +47,10 @@ def main():
     parser.add_argument("--shpo-states", type=str, default=None,
                         help="Comma-separated state codes for SHPO (e.g., IN,MO,UT)")
     parser.add_argument("--enrich-limit", type=int, help="Limit enrichment batch size")
+    parser.add_argument("--skip-ai-geocode", action="store_true",
+                        help="Skip Tier 2 AI address lookup during geocoding")
+    parser.add_argument("--ai-geocode-limit", type=int, default=None,
+                        help="Limit number of sites for AI geocoding")
     parser.add_argument("--no-cache", action="store_true", help="Force fresh API fetches")
     args = parser.parse_args()
 
@@ -152,16 +156,31 @@ def main():
         logger.info("After ingest: %d sites (%d with coordinates)", total, with_coords)
 
         # --- Stage 5: Geocode ---
-        logger.info("\n=== STAGE 5: GEOCODE ===")
+        logger.info("\n=== STAGE 5: GEOCODE (Tier 1 — Census + Nominatim) ===")
         from src.ingest.geocoder import run_geocoding
 
         geo_stats = run_geocoding(conn)
-        logger.info("Geocoding: %s", geo_stats)
+        logger.info("Geocoding Tier 1: %s", geo_stats)
 
         with_coords = conn.execute(
             "SELECT COUNT(*) FROM sites WHERE latitude IS NOT NULL"
         ).fetchone()[0]
-        logger.info("After geocoding: %d sites with coordinates", with_coords)
+        logger.info("After Tier 1 geocoding: %d sites with coordinates", with_coords)
+
+        # --- Stage 5b: AI Geocode ---
+        if not args.skip_ai_geocode:
+            logger.info("\n=== STAGE 5b: GEOCODE (Tier 2 — AI Address Lookup) ===")
+            from src.geocode.ai_address_lookup import lookup_addresses
+
+            ai_geo_stats = lookup_addresses(conn, limit=args.ai_geocode_limit)
+            logger.info("Geocoding Tier 2: %s", ai_geo_stats)
+
+            with_coords = conn.execute(
+                "SELECT COUNT(*) FROM sites WHERE latitude IS NOT NULL"
+            ).fetchone()[0]
+            logger.info("After Tier 2 geocoding: %d sites with coordinates", with_coords)
+        else:
+            logger.info("\n=== STAGE 5b: GEOCODE Tier 2 (SKIPPED) ===")
 
         # --- Stage 6: Profile ---
         logger.info("\n=== STAGE 6: PROFILE ===")

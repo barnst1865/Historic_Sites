@@ -113,11 +113,31 @@ def get_sites_for_enrichment(
 
 
 def get_sites_for_geocoding(conn: sqlite3.Connection) -> list[dict]:
-    """Fetch sites that have an address but no coordinates."""
+    """Fetch sites missing coordinates that have an address or at least a city."""
     return [
         dict(row)
         for row in conn.execute(
-            "SELECT * FROM sites WHERE latitude IS NULL AND address IS NOT NULL ORDER BY id"
+            "SELECT * FROM sites WHERE latitude IS NULL "
+            "AND (address IS NOT NULL OR city IS NOT NULL) "
+            "ORDER BY id"
+        ).fetchall()
+    ]
+
+
+def get_sites_for_ai_geocoding(conn: sqlite3.Connection) -> list[dict]:
+    """Fetch sites that need AI-assisted geocoding (Tier 2).
+
+    Returns sites that either:
+    - Still have no coordinates after Tier 1 Nominatim, OR
+    - Got only city-level precision from Nominatim
+    """
+    return [
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM sites WHERE "
+            "(latitude IS NULL OR geocode_quality = 'city_level') "
+            "AND (name IS NOT NULL AND city IS NOT NULL) "
+            "ORDER BY id"
         ).fetchall()
     ]
 

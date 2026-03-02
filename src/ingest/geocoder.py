@@ -7,6 +7,7 @@ Fallback: Nominatim (OpenStreetMap) via geopy (1 req/sec)
 Maps geocoder results to quality levels:
   - exact: Census Exact match
   - interpolated: Census Non_Exact match
+  - landmark: Nominatim matched by site name (likely precise)
   - city_level: Nominatim city-level result
   - zip_level: Nominatim ZIP-level result
 """
@@ -36,6 +37,17 @@ from src.db.queries import (
 from src.ingest.validator import validate_coordinates
 
 logger = logging.getLogger(__name__)
+
+
+def _format_elapsed(seconds: float) -> str:
+    """Format seconds into human-readable elapsed time."""
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
 
 
 def _build_census_batch(sites: list[dict]) -> str:
@@ -68,11 +80,16 @@ def geocode_census_batch(sites: list[dict]) -> dict[int, dict]:
     if not sites:
         return {}
 
+    # Census geocoder requires a street address — skip address-less sites
+    addressable = [s for s in sites if s.get("address")]
+    if not addressable:
+        return {}
+
     results = {}
 
     # Process in chunks of CENSUS_BATCH_SIZE
-    for i in range(0, len(sites), CENSUS_BATCH_SIZE):
-        chunk = sites[i:i + CENSUS_BATCH_SIZE]
+    for i in range(0, len(addressable), CENSUS_BATCH_SIZE):
+        chunk = addressable[i:i + CENSUS_BATCH_SIZE]
         csv_data = _build_census_batch(chunk)
 
         try:
@@ -126,39 +143,84 @@ def geocode_nominatim_single(
     address: str | None,
     city: str | None,
     state: str | None,
+    name: str | None = None,
 ) -> dict | None:
-    """Geocode a single address using Nominatim.
+    """Geocode a single site using Nominatim.
+
+    When address is missing but name is available, tries a landmark lookup
+    first ("name, city, state") before falling back to city-level.
 
     Args:
         address: Street address.
         city: City name.
         state: State abbreviation.
+        name: Site/landmark name (used when address is missing).
 
     Returns:
         Dict with 'lat', 'lon', 'quality', 'source' or None.
     """
-    parts = [p for p in [address, city, state, "United States"] if p]
-    query = ", ".join(parts)
+    geolocator = Nominatim(user_agent=NOMINATIM_USER_AGENT, timeout=10)
 
-    try:
-        geolocator = Nominatim(user_agent=NOMINATIM_USER_AGENT, timeout=10)
-        location = geolocator.geocode(query, exactly_one=True, country_codes="us")
+    # Strategy A: If we have an address, use it directly
+    if address:
+        parts = [p for p in [address, city, state, "United States"] if p]
+        query = ", ".join(parts)
+        try:
+            location = geolocator.geocode(query, exactly_one=True, country_codes="us")
+            if location:
+                return {
+                    "lat": location.latitude,
+                    "lon": location.longitude,
+                    "quality": "interpolated",
+                    "source": "nominatim",
+                }
+        except (GeocoderTimedOut, GeocoderServiceError) as e:
+            logger.warning("Nominatim geocoding failed for '%s': %s", query, e)
+        return None
 
-        if location:
-            # Determine quality based on the detail level
-            quality = "city_level"
-            if address:
-                quality = "interpolated"
+    # Strategy B: No address — try landmark name lookup first
+    if name and (city or state):
+        landmark_query = ", ".join(
+            p for p in [name, city, state, "United States"] if p
+        )
+        try:
+            location = geolocator.geocode(
+                landmark_query, exactly_one=True, country_codes="us"
+            )
+            if location:
+                return {
+                    "lat": location.latitude,
+                    "lon": location.longitude,
+                    "quality": "landmark",
+                    "source": "nominatim",
+                }
+        except (GeocoderTimedOut, GeocoderServiceError) as e:
+            logger.warning(
+                "Nominatim landmark lookup failed for '%s': %s", landmark_query, e
+            )
 
-            return {
-                "lat": location.latitude,
-                "lon": location.longitude,
-                "quality": quality,
-                "source": "nominatim",
-            }
+        # Rate limit between attempts
+        time.sleep(NOMINATIM_RATE_LIMIT)
 
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        logger.warning("Nominatim geocoding failed for '%s': %s", query, e)
+    # Strategy C: Fall back to city-level
+    city_parts = [p for p in [city, state, "United States"] if p]
+    if city_parts:
+        city_query = ", ".join(city_parts)
+        try:
+            location = geolocator.geocode(
+                city_query, exactly_one=True, country_codes="us"
+            )
+            if location:
+                return {
+                    "lat": location.latitude,
+                    "lon": location.longitude,
+                    "quality": "city_level",
+                    "source": "nominatim",
+                }
+        except (GeocoderTimedOut, GeocoderServiceError) as e:
+            logger.warning(
+                "Nominatim city-level failed for '%s': %s", city_query, e
+            )
 
     return None
 
@@ -171,10 +233,17 @@ def run_geocoding(conn: sqlite3.Connection, force: bool = False) -> dict:
         force: If True, re-geocode sites that already have coordinates.
 
     Returns:
-        Dict with 'census_matched', 'nominatim_matched', 'failed' counts.
+        Dict with counts by quality level.
     """
     run_id = start_pipeline_run(conn, "geocoding")
-    stats = {"census_matched": 0, "nominatim_matched": 0, "failed": 0, "skipped": 0}
+    stats = {
+        "census_matched": 0,
+        "nominatim_matched": 0,
+        "landmark_matched": 0,
+        "city_level": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
 
     # Get sites needing geocoding
     sites = get_sites_for_geocoding(conn)
@@ -185,8 +254,17 @@ def run_geocoding(conn: sqlite3.Connection, force: bool = False) -> dict:
 
     logger.info("Geocoding %d sites", len(sites))
 
-    # Strategy 1: Census Bureau batch
-    census_results = geocode_census_batch(sites)
+    # Separate sites with addresses (Census-eligible) from those without
+    sites_with_address = [s for s in sites if s.get("address")]
+    sites_without_address = [s for s in sites if not s.get("address")]
+    logger.info(
+        "  %d with street address (Census+Nominatim), %d without (Nominatim landmark)",
+        len(sites_with_address),
+        len(sites_without_address),
+    )
+
+    # Strategy 1: Census Bureau batch (only for sites with addresses)
+    census_results = geocode_census_batch(sites_with_address)
     for site_id, result in census_results.items():
         coord_check = validate_coordinates(result["lat"], result["lon"])
         if coord_check["valid"]:
@@ -200,13 +278,22 @@ def run_geocoding(conn: sqlite3.Connection, force: bool = False) -> dict:
 
     conn.commit()
 
-    # Strategy 2: Nominatim fallback for Census failures
-    failed_sites = [s for s in sites if s["id"] not in census_results]
-    logger.info("Nominatim fallback for %d sites", len(failed_sites))
+    # Strategy 2: Nominatim fallback for Census failures + all address-less sites
+    census_matched_ids = set(census_results.keys())
+    nominatim_sites = [
+        s for s in sites_with_address if s["id"] not in census_matched_ids
+    ] + sites_without_address
 
-    for site in failed_sites:
+    total_nom = len(nominatim_sites)
+    logger.info("Nominatim geocoding for %d sites", total_nom)
+    start_time = time.monotonic()
+
+    for idx, site in enumerate(nominatim_sites, 1):
         result = geocode_nominatim_single(
-            site.get("address"), site.get("city"), site.get("state")
+            site.get("address"),
+            site.get("city"),
+            site.get("state"),
+            name=site.get("name"),
         )
 
         if result:
@@ -218,15 +305,41 @@ def run_geocoding(conn: sqlite3.Connection, force: bool = False) -> dict:
                     "coordinates_source": result["source"],
                     "geocode_quality": result["quality"],
                 })
-                stats["nominatim_matched"] += 1
+                if result["quality"] == "landmark":
+                    stats["landmark_matched"] += 1
+                elif result["quality"] == "city_level":
+                    stats["city_level"] += 1
+                else:
+                    stats["nominatim_matched"] += 1
             else:
                 stats["failed"] += 1
         else:
             stats["failed"] += 1
 
+        # Batch commit every 50 sites for crash safety
+        if idx % 50 == 0:
+            conn.commit()
+
+            elapsed = time.monotonic() - start_time
+            avg_per_site = elapsed / idx
+            remaining = (total_nom - idx) * avg_per_site
+            logger.info(
+                "Nominatim progress: %d/%d | landmark=%d, city=%d, address=%d, failed=%d | "
+                "Elapsed: %s | ETA: %s",
+                idx,
+                total_nom,
+                stats["landmark_matched"],
+                stats["city_level"],
+                stats["nominatim_matched"],
+                stats["failed"],
+                _format_elapsed(elapsed),
+                _format_elapsed(remaining),
+            )
+
         time.sleep(NOMINATIM_RATE_LIMIT)
 
     conn.commit()
-    complete_pipeline_run(conn, run_id, sum(stats.values()))
+    total_processed = sum(stats.values())
+    complete_pipeline_run(conn, run_id, total_processed)
     logger.info("Geocoding complete: %s", stats)
     return stats
