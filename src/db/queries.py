@@ -55,7 +55,11 @@ def upsert_site(conn: sqlite3.Connection, site_data: dict) -> int:
                 if col in ("nris_refnum", "id"):
                     continue
                 if val is not None:
-                    updates.append(f"{col} = COALESCE(NULLIF({col}, ''), ?)")
+                    if isinstance(val, bool):
+                        # Boolean flags are additive — once True, stay True
+                        updates.append(f"{col} = MAX({col}, ?)")
+                    else:
+                        updates.append(f"{col} = COALESCE(NULLIF({col}, ''), ?)")
                     values.append(val)
 
             if updates:

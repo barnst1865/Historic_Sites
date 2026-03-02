@@ -164,6 +164,7 @@ def parse_parks(parks: list[dict]) -> list[dict]:
             "visiting_hours": visiting_hours,
             "admission_info": admission_info,
             "source_nps_parks": True,
+            "primary_source": "nps_parks",
         }
 
         if site["name"]:

@@ -149,6 +149,7 @@ def load_spreadsheet(filepath: Path, is_nhl: bool = True) -> list[dict]:
             site_data["nris_refnum"] = str(site_data["nris_refnum"]).split(".")[0].strip()
 
         site_data["source_spreadsheet"] = True
+        site_data["primary_source"] = "nhl_spreadsheet"
 
         # Extract NRHP classification
         criteria = _extract_criteria(row)
