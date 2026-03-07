@@ -16,6 +16,7 @@ from pathlib import Path
 from config.settings import (
     FUZZY_MATCH_CANDIDATE,
     FUZZY_MATCH_THRESHOLD,
+    FUZZY_NAME_ONLY_THRESHOLD,
     GEO_PROXIMITY_KM,
     OUTPUT_DIR,
     US_LAT_MAX,
@@ -277,6 +278,11 @@ def find_fuzzy_matches(
     Uses fuzzy name matching + geographic proximity. When a spatial_index
     is provided, only nearby candidates are checked instead of the full list.
 
+    Each match dict includes a 'match_type' field:
+      - 'proximity_match': distance <= 0.5km AND score >= FUZZY_MATCH_CANDIDATE
+      - 'name_only_match': score >= FUZZY_NAME_ONLY_THRESHOLD but no proximity check
+      - 'name_match': score >= FUZZY_MATCH_THRESHOLD (legacy, for backward compat)
+
     Returns:
         List of match dicts with 'site_id', 'name', 'score', 'distance_km', 'match_type'.
     """
@@ -309,19 +315,25 @@ def find_fuzzy_matches(
             "name": site["name"],
             "score": score,
             "distance_km": distance,
+            "city": site.get("city"),
         }
 
-        # Strong match: high name similarity
-        if score >= FUZZY_MATCH_THRESHOLD:
-            match_info["match_type"] = "name_match"
-            matches.append(match_info)
         # Geographic proximity with moderate name similarity
-        elif (
+        if (
             score >= FUZZY_MATCH_CANDIDATE
             and distance is not None
             and distance <= GEO_PROXIMITY_KM
         ):
             match_info["match_type"] = "proximity_match"
+            matches.append(match_info)
+        # Strong name match (with or without coords)
+        elif score >= FUZZY_MATCH_THRESHOLD:
+            if distance is not None and distance <= GEO_PROXIMITY_KM:
+                match_info["match_type"] = "proximity_match"
+            elif score >= FUZZY_NAME_ONLY_THRESHOLD:
+                match_info["match_type"] = "name_only_match"
+            else:
+                match_info["match_type"] = "name_match"
             matches.append(match_info)
 
     return sorted(matches, key=lambda m: m["score"], reverse=True)

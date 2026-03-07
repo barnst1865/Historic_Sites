@@ -15,7 +15,11 @@ Key behaviors:
 import logging
 import sqlite3
 
-from config.settings import FIELD_PRIORITY, FUZZY_MATCH_CANDIDATE, FUZZY_MATCH_THRESHOLD
+from config.settings import (
+    FIELD_PRIORITY,
+    FUZZY_MATCH_CANDIDATE,
+    FUZZY_NAME_ONLY_THRESHOLD,
+)
 from src.db.queries import (
     add_designation,
     add_nrhp_area,
@@ -237,6 +241,47 @@ def merge_nps_parks_records(
     return stats
 
 
+def _names_differ_only_by_number(name_a: str, name_b: str) -> bool:
+    """Check if two names are identical except for a number.
+
+    Catches false positives like 'Fire Station No. 25' vs 'Fire Station No. 7',
+    'Comfort Station O-303' vs 'Comfort Station O-302', or
+    'N 23rd Street Bridge' vs 'N 21st Street Bridge'.
+    """
+    import re
+
+    # Match digit sequences and ordinals (1st, 2nd, 3rd, 4th, 21st, etc.)
+    num_pattern = r"\d+(?:st|nd|rd|th)?\b"
+    placeholder = "\x00"
+    a_stripped = re.sub(num_pattern, placeholder, name_a.lower().strip())
+    b_stripped = re.sub(num_pattern, placeholder, name_b.lower().strip())
+
+    if a_stripped != b_stripped:
+        return False
+
+    # Same template — check if any numbers actually differ
+    a_nums = re.findall(num_pattern, name_a.lower())
+    b_nums = re.findall(num_pattern, name_b.lower())
+    return a_nums != b_nums
+
+
+def _normalize_address(addr: str) -> str:
+    """Normalize an address for comparison (lowercase, strip punctuation)."""
+    import re
+
+    addr = addr.lower().strip()
+    addr = re.sub(r"[.,#]", "", addr)
+    # Common abbreviations
+    for full, abbr in [
+        ("street", "st"), ("avenue", "ave"), ("boulevard", "blvd"),
+        ("drive", "dr"), ("road", "rd"), ("lane", "ln"),
+        ("court", "ct"), ("place", "pl"), ("north", "n"),
+        ("south", "s"), ("east", "e"), ("west", "w"),
+    ]:
+        addr = re.sub(rf"\b{full}\b", abbr, addr)
+    return re.sub(r"\s+", " ", addr).strip()
+
+
 def merge_shpo_records(
     conn: sqlite3.Connection,
     sites: list[dict],
@@ -245,16 +290,19 @@ def merge_shpo_records(
 ) -> dict:
     """Merge SHPO state records into the database.
 
-    Three-pass matching:
+    Five-pass matching:
       1. NRIS refnum match (if record has nris_refnum)
-      2. Fuzzy name + geographic proximity match (scoped to same state)
-      3. Insert as new record
+      2. Address + city match (if both records have address and city)
+      3. Proximity + fuzzy name match (distance <= 0.5km AND score >= 70)
+      4. Name-only match with strict threshold (score >= 90, no coords required)
+      5. Insert as new record
 
     Matched sites get source_shpo=1 and NULL fields filled via COALESCE.
     Federal data is never overwritten. Designations are always added (additive).
 
     Returns:
-        Dict with 'inserted', 'updated', 'matched_nris', 'matched_fuzzy', 'skipped' counts.
+        Dict with 'inserted', 'updated', 'matched_nris', 'matched_address',
+        'matched_fuzzy', 'skipped' counts.
     """
     source_name = f"shpo_{state_code.lower()}"
     run_id = start_pipeline_run(conn, f"merge_{source_name}")
@@ -262,6 +310,7 @@ def merge_shpo_records(
         "inserted": 0,
         "updated": 0,
         "matched_nris": 0,
+        "matched_address": 0,
         "matched_fuzzy": 0,
         "skipped": 0,
     }
@@ -270,7 +319,8 @@ def merge_shpo_records(
     existing = [
         dict(row)
         for row in conn.execute(
-            "SELECT id, name, latitude, longitude FROM sites WHERE state = ?",
+            "SELECT id, name, latitude, longitude, address, city"
+            " FROM sites WHERE state = ?",
             (state_code,),
         ).fetchall()
     ]
@@ -279,6 +329,13 @@ def merge_shpo_records(
     spatial_idx = SpatialIndex()
     for site in existing:
         spatial_idx.add(site)
+
+    # Build address index for Pass 2
+    addr_index: dict[str, list[dict]] = {}
+    for site in existing:
+        if site.get("address") and site.get("city"):
+            key = _normalize_address(site["address"]) + "|" + site["city"].lower().strip()
+            addr_index.setdefault(key, []).append(site)
 
     total_records = len(sites)
     for idx, site_data in enumerate(sites):
@@ -295,7 +352,30 @@ def merge_shpo_records(
                 site_id = existing_site["id"]
                 stats["matched_nris"] += 1
 
-        # Pass 2: Fuzzy name + proximity match
+        # Pass 2: Address + city match
+        if site_id is None and site_data.get("address") and site_data.get("city"):
+            addr_key = (
+                _normalize_address(site_data["address"])
+                + "|" + site_data["city"].lower().strip()
+            )
+            addr_matches = addr_index.get(addr_key, [])
+            if len(addr_matches) == 1:
+                site_id = addr_matches[0]["id"]
+                stats["matched_address"] += 1
+            elif len(addr_matches) > 1:
+                # Multiple sites at same address — use name as tiebreaker
+                from rapidfuzz import fuzz
+
+                best = max(
+                    addr_matches,
+                    key=lambda s: fuzz.token_sort_ratio(
+                        site_data.get("name", ""), s.get("name", "")
+                    ),
+                )
+                site_id = best["id"]
+                stats["matched_address"] += 1
+
+        # Pass 3: Proximity + fuzzy name match (requires coords)
         if site_id is None:
             matches = find_fuzzy_matches(
                 site_data.get("name", ""),
@@ -304,17 +384,60 @@ def merge_shpo_records(
                 existing,
                 spatial_index=spatial_idx,
             )
-            if matches and matches[0]["score"] >= FUZZY_MATCH_THRESHOLD:
-                site_id = matches[0]["site_id"]
+            incoming_name = site_data.get("name", "")
+
+            # First try proximity matches (most reliable)
+            proximity_matches = [
+                m for m in matches
+                if m["match_type"] == "proximity_match"
+                and not _names_differ_only_by_number(incoming_name, m["name"])
+            ]
+            if proximity_matches:
+                site_id = proximity_matches[0]["site_id"]
                 stats["matched_fuzzy"] += 1
-            elif matches and matches[0]["score"] >= FUZZY_MATCH_CANDIDATE:
-                logger.info(
-                    "[SHPO] %s: Candidate match (score=%d): '%s' ~ '%s'",
-                    state_code,
-                    matches[0]["score"],
-                    site_data.get("name"),
-                    matches[0]["name"],
-                )
+            else:
+                # Pass 4: Name-only match with strict threshold
+                # NEVER accept when cities differ or names differ only by number
+                name_only = [
+                    m for m in matches
+                    if m["match_type"] == "name_only_match"
+                    and m["score"] >= FUZZY_NAME_ONLY_THRESHOLD
+                    and not _names_differ_only_by_number(incoming_name, m["name"])
+                ]
+                incoming_city = (site_data.get("city") or "").lower().strip()
+                if name_only and incoming_city:
+                    # Filter to same-city matches only
+                    same_city = [
+                        m for m in name_only
+                        if m.get("city") and m["city"].lower().strip() == incoming_city
+                    ]
+                    if same_city:
+                        site_id = same_city[0]["site_id"]
+                        stats["matched_fuzzy"] += 1
+                    # If matched city differs, reject — different city = different site
+                elif name_only and not incoming_city:
+                    # No city on incoming record — only accept if matched also
+                    # lacks a city (both unknown) or score is very high
+                    no_city_matches = [
+                        m for m in name_only if not m.get("city")
+                    ]
+                    if no_city_matches:
+                        site_id = no_city_matches[0]["site_id"]
+                        stats["matched_fuzzy"] += 1
+                    elif name_only[0]["score"] >= 95:
+                        site_id = name_only[0]["site_id"]
+                        stats["matched_fuzzy"] += 1
+
+                # Log candidates that didn't match
+                if site_id is None and matches and matches[0]["score"] >= FUZZY_MATCH_CANDIDATE:
+                    logger.info(
+                        "[SHPO] %s: Candidate match (score=%d, type=%s): '%s' ~ '%s'",
+                        state_code,
+                        matches[0]["score"],
+                        matches[0]["match_type"],
+                        site_data.get("name"),
+                        matches[0]["name"],
+                    )
 
         # Update matched site or insert new
         if site_id is not None:
@@ -347,7 +470,7 @@ def merge_shpo_records(
                 )
             stats["updated"] += 1
         else:
-            # Pass 3: Insert as new record
+            # Pass 5: Insert as new record
             # Remove state_record_id before insert (not a sites table column)
             insert_data = {
                 k: v for k, v in site_data.items() if k != "state_record_id"
@@ -355,15 +478,23 @@ def merge_shpo_records(
             site_id = upsert_site(conn, insert_data)
             stats["inserted"] += 1
 
-            # Add to existing list and spatial index for subsequent matching
+            # Add to existing list, spatial index, and address index
             new_entry = {
                 "id": site_id,
                 "name": site_data.get("name", ""),
                 "latitude": site_data.get("latitude"),
                 "longitude": site_data.get("longitude"),
+                "address": site_data.get("address"),
+                "city": site_data.get("city"),
             }
             existing.append(new_entry)
             spatial_idx.add(new_entry)
+            if new_entry.get("address") and new_entry.get("city"):
+                key = (
+                    _normalize_address(new_entry["address"])
+                    + "|" + new_entry["city"].lower().strip()
+                )
+                addr_index.setdefault(key, []).append(new_entry)
 
         # Always add designation (INSERT OR IGNORE — additive)
         for desig_type in config.get("designation_types", ["State Register"]):
@@ -386,11 +517,12 @@ def merge_shpo_records(
         if processed % 5000 == 0 or processed == total_records:
             logger.info(
                 "[SHPO] %s: %d/%d records merged "
-                "(nris=%d, fuzzy=%d, inserted=%d, skipped=%d)",
+                "(nris=%d, addr=%d, fuzzy=%d, inserted=%d, skipped=%d)",
                 state_code,
                 processed,
                 total_records,
                 stats["matched_nris"],
+                stats["matched_address"],
                 stats["matched_fuzzy"],
                 stats["inserted"],
                 stats["skipped"],

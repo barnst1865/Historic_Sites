@@ -588,6 +588,41 @@ STATE_SOURCES = {
         "designating_authority": "Hawaii SHPO",
         "active": True,
     },
+    # --- California ---
+    "CA_LA": {
+        "adapter": "arcgis",
+        "state_code": "CA",
+        "name": "LA Historic Resources (California State Historic Resources)",
+        "endpoint": (
+            "https://services5.arcgis.com/7nsPwEMP38bSkCjy/arcgis/rest/services/"
+            "California_State_Historic_Resources/FeatureServer/4/query"
+        ),
+        "field_map": {
+            "name": ["NAME"],
+            "address": ["LOCATION"],
+            "city": [],
+            "county": [],
+            "state_record_id": ["MNT_NUM"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": ["DATE_ACTIVE"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["California Register", "State Register"],
+        "designating_authority": "California OHP",
+        "active": True,
+    },
+    "CA": {
+        "adapter": "custom",
+        "state_code": "CA",
+        "name": "California OHP Listed Resources (statewide)",
+        "designation_types": ["California Register", "State Register"],
+        "designating_authority": "California Office of Historic Preservation",
+        "active": True,
+    },
     # --- National datasets ---
     "NRHP_NATIONAL": {
         "adapter": "arcgis",

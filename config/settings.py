@@ -69,6 +69,7 @@ SCORE_FLAG_REVIEW = 0.5
 # --- Entity Resolution ---
 FUZZY_MATCH_THRESHOLD = 85  # thefuzz token_sort_ratio minimum
 FUZZY_MATCH_CANDIDATE = 70  # Lower threshold for logging candidates
+FUZZY_NAME_ONLY_THRESHOLD = 90  # Stricter threshold when no coordinates available
 GEO_PROXIMITY_KM = 0.5  # Max distance for geographic proximity match
 
 # --- US Bounding Box (including AK, HI, territories) ---
