@@ -24,14 +24,15 @@ class ArcGISAdapter(SHPOAdapter):
     def fetch(self, config: dict, use_cache: bool = True) -> list[dict]:
         """Fetch all records from a state ArcGIS endpoint with pagination."""
         state_code = config["_state_code"]
-        cache_file = RAW_DIR / f"shpo_{state_code.lower()}.json"
+        source_key = config.get("_source_key", state_code)
+        cache_file = RAW_DIR / f"shpo_{source_key.lower()}.json"
 
         if use_cache and cache_file.exists():
-            logger.info("[SHPO] %s: Loading from cache: %s", state_code, cache_file)
+            logger.info("[SHPO] %s: Loading from cache: %s", source_key, cache_file)
             with open(cache_file) as f:
                 return json.load(f)
 
-        logger.info("[SHPO] %s: Fetching from %s", state_code, config["endpoint"])
+        logger.info("[SHPO] %s: Fetching from %s", source_key, config["endpoint"])
         all_features = []
         offset = 0
         page_size = config.get("page_size", 1000)
@@ -54,7 +55,7 @@ class ArcGISAdapter(SHPOAdapter):
 
             if "error" in data:
                 raise RuntimeError(
-                    f"[SHPO] {state_code}: ArcGIS API error: {data['error']}"
+                    f"[SHPO] {source_key}: ArcGIS API error: {data['error']}"
                 )
 
             features = data.get("features", [])
@@ -65,7 +66,7 @@ class ArcGISAdapter(SHPOAdapter):
             offset += len(features)
             logger.info(
                 "[SHPO] %s: Fetched %d records (total: %d)",
-                state_code,
+                source_key,
                 len(features),
                 len(all_features),
             )
@@ -81,7 +82,7 @@ class ArcGISAdapter(SHPOAdapter):
             json.dump(all_features, f)
         logger.info(
             "[SHPO] %s: Cached %d records to %s",
-            state_code,
+            source_key,
             len(all_features),
             cache_file,
         )
@@ -91,6 +92,7 @@ class ArcGISAdapter(SHPOAdapter):
     def parse(self, raw_data: list[dict], config: dict) -> list[dict]:
         """Parse ArcGIS features into site records using the state's field map."""
         state_code = config["_state_code"]
+        source_key = config.get("_source_key", state_code)
         field_map = config.get("field_map", {})
         sites = []
 

@@ -284,6 +284,77 @@ STATE_SOURCES = {
         "designating_authority": "Tennessee Historical Commission",
         "active": True,
     },
+    "AL": {
+        "adapter": "arcgis",
+        "name": "Alabama Architectural Survey Files",
+        "endpoint": (
+            "https://services2.arcgis.com/XBn0Kai3hQ20FeCo/arcgis/rest/services/"
+            "AHC_Architectural_Survey_Files_Public_View/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Prop_Name"],
+            "address": ["Str_Add"],
+            "city": ["City"],
+            "county": [],
+            "state_record_id": [],
+            "date_constructed": ["Constr_Date"],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Alabama Historical Commission",
+        "active": True,
+    },
+    "AL_NR": {
+        "adapter": "arcgis",
+        "state_code": "AL",
+        "name": "Alabama National Register Files",
+        "endpoint": (
+            "https://services2.arcgis.com/XBn0Kai3hQ20FeCo/arcgis/rest/services/"
+            "AHC_National_Register_Files_Public_View/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["RESNAME"],
+            "address": [],
+            "city": [],
+            "county": [],
+            "state_record_id": ["CR_ID"],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register"],
+        "designating_authority": "Alabama Historical Commission",
+        "active": True,
+    },
+    "RI": {
+        "adapter": "arcgis",
+        "name": "Rhode Island Historic Sites",
+        "endpoint": (
+            "https://services2.arcgis.com/S8zZg9pg23JUEexQ/arcgis/rest/services/"
+            "CULT_Historic_Sites_spf/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["NAME"],
+            "address": [],
+            "city": ["TOWN"],
+            "county": [],
+            "state_record_id": ["CODE"],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Rhode Island SHPO",
+        "active": True,
+    },
     # --- Texas GDB downloads from atlas.thc.texas.gov ---
     "TX_NR": {
         "adapter": "gdb",
