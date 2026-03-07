@@ -588,4 +588,59 @@ STATE_SOURCES = {
         "designating_authority": "Hawaii SHPO",
         "active": True,
     },
+    # --- National datasets ---
+    "NRHP_NATIONAL": {
+        "adapter": "arcgis",
+        "state_code": "US",
+        "name": "National Register of Historic Places - NPS Points",
+        "endpoint": (
+            "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/"
+            "nrhp_points_v1/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["RESNAME"],
+            "address": ["Address"],
+            "city": ["City"],
+            "county": ["County"],
+            "state_record_id": ["CR_ID"],
+            "date_constructed": [],
+            "nris_refnum": ["NRIS_Refnum"],
+            "date_listed": ["CertDate"],
+            "state_name_field": "State",
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "multi_state": True,
+        "designation_types": ["National Register"],
+        "designating_authority": "National Park Service",
+        "active": True,
+    },
+    # --- Regional datasets ---
+    "GA_ATL": {
+        "adapter": "arcgis",
+        "state_code": "GA",
+        "name": "Georgia Historic Resources (Atlanta Region)",
+        "endpoint": (
+            "https://services1.arcgis.com/Ug5xGQbHsD8zuZzM/arcgis/rest/services/"
+            "ARC_Historic_Resources/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Name"],
+            "address": ["ADDRESS"],
+            "city": ["CITY"],
+            "county": ["County"],
+            "state_record_id": ["ResourceID"],
+            "date_constructed": ["DateofConstruction"],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Georgia HPD",
+        "active": True,
+    },
 }

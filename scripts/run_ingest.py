@@ -115,8 +115,27 @@ def ingest_shpo(conn, states: list[str] | None = None, no_cache: bool = False):
             sites = parse_state(source_key, raw)
 
             config = STATE_SOURCES[source_key]
-            real_state = config.get("state_code", source_key.split("_")[0])
-            stats = merge_shpo_records(conn, sites, real_state, config)
+
+            if config.get("multi_state"):
+                # Group records by state and merge each group separately
+                from collections import defaultdict
+                by_state = defaultdict(list)
+                for s in sites:
+                    by_state[s.get("state", "XX")].append(s)
+
+                combined = {"inserted": 0, "updated": 0, "matched_nris": 0,
+                            "matched_fuzzy": 0, "skipped": 0}
+                for st_code in sorted(by_state):
+                    st_sites = by_state[st_code]
+                    st_stats = merge_shpo_records(conn, st_sites, st_code, config)
+                    for k in combined:
+                        combined[k] += st_stats.get(k, 0)
+                    logger.info("SHPO %s/%s: %s", source_key, st_code, st_stats)
+                stats = combined
+            else:
+                real_state = config.get("state_code", source_key.split("_")[0])
+                stats = merge_shpo_records(conn, sites, real_state, config)
+
             all_stats[source_key] = stats
             logger.info("SHPO %s merge: %s", source_key, stats)
         except Exception:
