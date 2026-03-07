@@ -235,4 +235,53 @@ STATE_SOURCES = {
         "designating_authority": "West Virginia SHPO",
         "active": True,
     },
+    "TX": {
+        "adapter": "arcgis",
+        "name": "Texas Historical Commission - Historic Properties",
+        "endpoint": (
+            "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/"
+            "Historic_Resources/FeatureServer/1/query"
+        ),
+        "field_map": {
+            "name": ["Resource", "Alt_Name"],
+            "address": ["Address"],
+            "city": ["City"],
+            "county": ["County"],
+            "state_record_id": ["Prop_Num"],
+            "date_constructed": ["Period"],
+            "nris_refnum": [],
+            "date_listed": ["NR_Date"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "Texas Historical Commission",
+        "active": True,
+    },
+    "TN": {
+        "adapter": "arcgis",
+        "name": "Tennessee State Historic Sites",
+        "endpoint": (
+            "https://services5.arcgis.com/bPacKTm9cauMXVfn/arcgis/rest/services/"
+            "Tennessee_State_Historic_Sites/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Name"],
+            "address": ["Address"],
+            "city": [],
+            "county": [],
+            "state_record_id": [],
+            "date_constructed": ["YearBuilt"],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Tennessee Historical Commission",
+        "active": True,
+    },
 }
