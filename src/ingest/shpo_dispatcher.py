@@ -11,23 +11,28 @@ import logging
 
 from config.state_sources import STATE_SOURCES
 from src.ingest.shpo_adapters.arcgis_adapter import ArcGISAdapter
+from src.ingest.shpo_adapters.gdb_adapter import GDBAdapter
 
 logger = logging.getLogger(__name__)
 
 # Adapter instances (reusable, stateless)
 _ADAPTERS = {
     "arcgis": ArcGISAdapter(),
+    "gdb": GDBAdapter(),
 }
 
 
 def get_active_states(filter_states: list[str] | None = None) -> list[str]:
-    """Return list of active state codes, optionally filtered.
+    """Return list of active source keys, optionally filtered by state code.
+
+    Keys can be plain state codes ('TX') or composite keys ('TX_NR').
+    Filtering by 'TX' matches both 'TX' and 'TX_*' entries.
 
     Args:
-        filter_states: If provided, only return these states (must also be active).
+        filter_states: If provided, only return sources for these states.
 
     Returns:
-        List of uppercase state codes.
+        List of uppercase source keys.
     """
     active = [
         code
@@ -37,8 +42,13 @@ def get_active_states(filter_states: list[str] | None = None) -> list[str]:
 
     if filter_states:
         requested = {s.upper() for s in filter_states}
-        active = [s for s in active if s in requested]
-        unknown = requested - set(STATE_SOURCES.keys())
+        active = [
+            key for key in active
+            if key in requested or key.split("_")[0] in requested
+        ]
+        # Check for completely unknown state prefixes or exact keys
+        known = set(STATE_SOURCES.keys()) | {k.split("_")[0] for k in STATE_SOURCES}
+        unknown = requested - known
         if unknown:
             logger.warning(
                 "[SHPO] Unknown state codes (not in STATE_SOURCES): %s",
@@ -48,13 +58,18 @@ def get_active_states(filter_states: list[str] | None = None) -> list[str]:
     return sorted(active)
 
 
-def _get_config(state_code: str) -> dict:
-    """Get config for a state, injecting the state code."""
-    state_code = state_code.upper()
-    if state_code not in STATE_SOURCES:
-        raise ValueError(f"No SHPO source configured for state: {state_code}")
-    config = STATE_SOURCES[state_code].copy()
-    config["_state_code"] = state_code
+def _get_config(source_key: str) -> dict:
+    """Get config for a source key, injecting state code and source key.
+
+    For composite keys like 'TX_NR', the state code is taken from the
+    config's 'state_code' field or the prefix before '_'.
+    """
+    source_key = source_key.upper()
+    if source_key not in STATE_SOURCES:
+        raise ValueError(f"No SHPO source configured for: {source_key}")
+    config = STATE_SOURCES[source_key].copy()
+    config["_source_key"] = source_key
+    config["_state_code"] = config.get("state_code", source_key.split("_")[0])
     return config
 
 

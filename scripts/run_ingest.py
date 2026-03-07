@@ -108,19 +108,20 @@ def ingest_shpo(conn, states: list[str] | None = None, no_cache: bool = False):
     logger.info("=== Ingesting SHPO: %s ===", ", ".join(active))
     all_stats = {}
 
-    for state_code in active:
+    for source_key in active:
         try:
-            logger.info("--- SHPO %s ---", state_code)
-            raw = fetch_state(state_code, use_cache=not no_cache)
-            sites = parse_state(state_code, raw)
+            logger.info("--- SHPO %s ---", source_key)
+            raw = fetch_state(source_key, use_cache=not no_cache)
+            sites = parse_state(source_key, raw)
 
-            config = STATE_SOURCES[state_code]
-            stats = merge_shpo_records(conn, sites, state_code, config)
-            all_stats[state_code] = stats
-            logger.info("SHPO %s merge: %s", state_code, stats)
+            config = STATE_SOURCES[source_key]
+            real_state = config.get("state_code", source_key.split("_")[0])
+            stats = merge_shpo_records(conn, sites, real_state, config)
+            all_stats[source_key] = stats
+            logger.info("SHPO %s merge: %s", source_key, stats)
         except Exception:
-            logger.exception("SHPO %s failed — continuing with next state", state_code)
-            all_stats[state_code] = {"error": True}
+            logger.exception("SHPO %s failed — continuing with next source", source_key)
+            all_stats[source_key] = {"error": True}
 
     return all_stats
 
