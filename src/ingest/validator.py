@@ -9,6 +9,7 @@ the database to catch issues early.
 import json
 import logging
 import re
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -222,26 +223,81 @@ def _normalize_name_for_matching(name: str) -> str:
     return normalized
 
 
+class SpatialIndex:
+    """Coarse lat/lon grid for fast spatial candidate lookup.
+
+    Buckets sites into ~5.5km cells (0.05 degrees). Lookup returns sites
+    from the 9 neighboring cells, reducing fuzzy match candidates from
+    hundreds of thousands to typically 10-180.
+    """
+
+    CELL_SIZE = 0.05  # ~5.5 km at US latitudes
+
+    def __init__(self):
+        self._grid: dict[tuple, list[dict]] = defaultdict(list)
+        self._no_coords: list[dict] = []
+
+    def _cell(self, lat: float, lon: float) -> tuple[int, int]:
+        return (round(lat / self.CELL_SIZE), round(lon / self.CELL_SIZE))
+
+    def add(self, site: dict):
+        """Add a site to the spatial index."""
+        lat, lon = site.get("latitude"), site.get("longitude")
+        if lat is not None and lon is not None:
+            self._grid[self._cell(lat, lon)].append(site)
+        else:
+            self._no_coords.append(site)
+
+    def neighbors(self, lat: float | None, lon: float | None) -> list[dict]:
+        """Return sites in the 9 neighboring cells + all no-coord sites."""
+        if lat is None or lon is None:
+            # No coords: return everything (can't narrow spatially)
+            result = list(self._no_coords)
+            for bucket in self._grid.values():
+                result.extend(bucket)
+            return result
+
+        cx, cy = self._cell(lat, lon)
+        result = list(self._no_coords)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                result.extend(self._grid.get((cx + dx, cy + dy), []))
+        return result
+
+
 def find_fuzzy_matches(
     name: str,
     lat: float | None,
     lon: float | None,
     existing_sites: list[dict],
+    spatial_index: SpatialIndex | None = None,
 ) -> list[dict]:
     """Find potential matches for a site among existing records.
 
-    Uses fuzzy name matching + geographic proximity.
+    Uses fuzzy name matching + geographic proximity. When a spatial_index
+    is provided, only nearby candidates are checked instead of the full list.
 
     Returns:
         List of match dicts with 'site_id', 'name', 'score', 'distance_km', 'match_type'.
     """
-    from thefuzz import fuzz
+    from rapidfuzz import fuzz
 
     normalized = _normalize_name_for_matching(name)
+    norm_len = len(normalized)
     matches = []
 
-    for site in existing_sites:
+    candidates = spatial_index.neighbors(lat, lon) if spatial_index else existing_sites
+
+    for site in candidates:
         existing_norm = _normalize_name_for_matching(site["name"])
+
+        # Cheap length-ratio pre-check: skip if lengths differ by >2x
+        ex_len = len(existing_norm)
+        if norm_len and ex_len:
+            ratio = norm_len / ex_len if norm_len < ex_len else ex_len / norm_len
+            if ratio < 0.4:
+                continue
+
         score = fuzz.token_sort_ratio(normalized, existing_norm)
 
         distance = None

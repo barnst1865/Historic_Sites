@@ -111,6 +111,9 @@ class ArcGISAdapter(SHPOAdapter):
 
             # Resolve name from field aliases
             name = _get_attr(attrs, *field_map.get("name", []))
+            if name:
+                # Strip invisible Unicode chars (zero-width spaces, etc.)
+                name = name.strip().strip("\u200b\u200c\u200d\ufeff")
 
             # Skip records with no name
             if not name:

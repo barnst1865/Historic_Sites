@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from src.db.schema import create_tables, seed_categories
 from src.ingest.merger import merge_shpo_records
 from src.ingest.shpo_adapters.arcgis_adapter import ArcGISAdapter
 from src.ingest.shpo_dispatcher import get_active_states, parse_state
+from src.ingest.validator import SpatialIndex, find_fuzzy_matches
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -319,3 +321,90 @@ class TestSHPOMerge:
 
         total = db.execute("SELECT COUNT(*) FROM sites").fetchone()[0]
         assert total == 2
+
+
+# --- SpatialIndex Tests ---
+
+
+class TestSpatialIndex:
+    def test_add_and_neighbors_same_cell(self):
+        idx = SpatialIndex()
+        site = {"id": 1, "name": "Site A", "latitude": 40.0, "longitude": -86.0}
+        idx.add(site)
+        results = idx.neighbors(40.0, -86.0)
+        assert len(results) == 1
+        assert results[0]["id"] == 1
+
+    def test_neighbors_adjacent_cell(self):
+        idx = SpatialIndex()
+        site = {"id": 1, "name": "Site A", "latitude": 40.0, "longitude": -86.0}
+        idx.add(site)
+        # Query from adjacent cell (~5km away)
+        results = idx.neighbors(40.04, -86.04)
+        assert len(results) == 1
+
+    def test_neighbors_far_away(self):
+        idx = SpatialIndex()
+        site = {"id": 1, "name": "Site A", "latitude": 40.0, "longitude": -86.0}
+        idx.add(site)
+        # Query from far away (different state)
+        results = idx.neighbors(34.0, -118.0)
+        assert len(results) == 0
+
+    def test_no_coords_always_included(self):
+        idx = SpatialIndex()
+        site_with = {"id": 1, "name": "With Coords", "latitude": 40.0, "longitude": -86.0}
+        site_without = {"id": 2, "name": "No Coords", "latitude": None, "longitude": None}
+        idx.add(site_with)
+        idx.add(site_without)
+
+        # Query far from site_with — should still get site_without
+        results = idx.neighbors(34.0, -118.0)
+        assert len(results) == 1
+        assert results[0]["id"] == 2
+
+        # Query near site_with — should get both
+        results = idx.neighbors(40.0, -86.0)
+        assert len(results) == 2
+
+    def test_query_with_no_coords_returns_all(self):
+        idx = SpatialIndex()
+        idx.add({"id": 1, "name": "A", "latitude": 40.0, "longitude": -86.0})
+        idx.add({"id": 2, "name": "B", "latitude": 34.0, "longitude": -118.0})
+        # Query with no coords should return everything
+        results = idx.neighbors(None, None)
+        assert len(results) == 2
+
+    def test_performance_1000x1000(self):
+        """1,000 records against 1,000 existing should complete in <5s."""
+        import random
+
+        random.seed(42)
+
+        # Build spatial index with 1,000 existing sites
+        idx = SpatialIndex()
+        existing = []
+        for i in range(1000):
+            site = {
+                "id": i,
+                "name": f"Historic Site {i}",
+                "latitude": 38.0 + random.uniform(-2, 2),
+                "longitude": -90.0 + random.uniform(-2, 2),
+            }
+            idx.add(site)
+            existing.append(site)
+
+        # Fuzzy match 1,000 incoming records
+        start = time.time()
+        for i in range(1000):
+            lat = 38.0 + random.uniform(-2, 2)
+            lon = -90.0 + random.uniform(-2, 2)
+            find_fuzzy_matches(
+                f"Test Building {i}",
+                lat,
+                lon,
+                existing,
+                spatial_index=idx,
+            )
+        elapsed = time.time() - start
+        assert elapsed < 5.0, f"Performance test took {elapsed:.1f}s (expected <5s)"

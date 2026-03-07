@@ -27,7 +27,7 @@ from src.db.queries import (
     update_source_metadata,
     upsert_site,
 )
-from src.ingest.validator import find_fuzzy_matches, validate_site
+from src.ingest.validator import SpatialIndex, find_fuzzy_matches, validate_site
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +275,13 @@ def merge_shpo_records(
         ).fetchall()
     ]
 
-    for site_data in sites:
+    # Build spatial index for O(1) neighbor lookup instead of O(N) scan
+    spatial_idx = SpatialIndex()
+    for site in existing:
+        spatial_idx.add(site)
+
+    total_records = len(sites)
+    for idx, site_data in enumerate(sites):
         result = validate_site(site_data)
         site_data = result["site_data"]
 
@@ -296,6 +302,7 @@ def merge_shpo_records(
                 site_data.get("latitude"),
                 site_data.get("longitude"),
                 existing,
+                spatial_index=spatial_idx,
             )
             if matches and matches[0]["score"] >= FUZZY_MATCH_THRESHOLD:
                 site_id = matches[0]["site_id"]
@@ -348,13 +355,15 @@ def merge_shpo_records(
             site_id = upsert_site(conn, insert_data)
             stats["inserted"] += 1
 
-            # Add to existing list for subsequent fuzzy matching
-            existing.append({
+            # Add to existing list and spatial index for subsequent matching
+            new_entry = {
                 "id": site_id,
                 "name": site_data.get("name", ""),
                 "latitude": site_data.get("latitude"),
                 "longitude": site_data.get("longitude"),
-            })
+            }
+            existing.append(new_entry)
+            spatial_idx.add(new_entry)
 
         # Always add designation (INSERT OR IGNORE — additive)
         for desig_type in config.get("designation_types", ["State Register"]):
@@ -371,6 +380,23 @@ def merge_shpo_records(
             "source_record_id": site_data.get("state_record_id") or refnum,
             "raw_data": site_data,
         })
+
+        # Progress logging every 5,000 records + periodic commits every 10,000
+        processed = idx + 1
+        if processed % 5000 == 0 or processed == total_records:
+            logger.info(
+                "[SHPO] %s: %d/%d records merged "
+                "(nris=%d, fuzzy=%d, inserted=%d, skipped=%d)",
+                state_code,
+                processed,
+                total_records,
+                stats["matched_nris"],
+                stats["matched_fuzzy"],
+                stats["inserted"],
+                stats["skipped"],
+            )
+        if processed % 10000 == 0:
+            conn.commit()
 
     conn.commit()
     total_processed = sum(stats.values())

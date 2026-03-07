@@ -164,3 +164,31 @@ Stage 1: INGEST
 - Coordinate discrepancies between state and federal data logged but federal coordinates kept
 
 **Expected volume:** 200K-500K sites total across all states (from ~200 in small states to 30K+ in large ones).
+
+---
+
+## Known Issues & TODO
+
+### Merge Performance (Critical — Blocks Phase 2)
+
+The fuzzy name matching in `merge_shpo_records()` is O(n²) — each incoming record is compared against a growing `existing` list using `find_fuzzy_matches()`. This is manageable for small states (MO: ~1,800 records, ~18s) but prohibitive for large states:
+
+- **Indiana (IN):** 205K records — merge did not complete after 30+ minutes before being stopped
+- States like CA, NY, OH, TX will be similar or worse
+
+**Potential fixes:**
+1. **Spatial indexing:** Pre-filter candidates by county/city before fuzzy matching, reducing comparisons from O(n) to O(small subset)
+2. **Name hashing / blocking:** Group records by first few characters or soundex before comparing
+3. **Batch fuzzy matching:** Use a library like `rapidfuzz` with process.extract() for vectorized matching
+4. **Skip fuzzy for large states:** If a state has >50K records, only match on NRIS refnum and insert the rest as new
+
+Progress logging (every 5K records) and periodic commits (every 10K) were added on 2026-03-06 to `merge_shpo_records()` for visibility.
+
+### Phase 2 TODO (Resuming SHPO Expansion)
+
+- Optimize merge performance (above) before adding more states
+- Add more ArcGIS states (config-only once merge is fast enough)
+- Build `csv_adapter.py` for California (300K+ per-county CSVs)
+- Build `socrata_adapter.py` for Socrata portal states
+- Custom scrapers in `shpo_scrapers/` as needed
+- Operational dashboard: `scripts/shpo_status.py`
