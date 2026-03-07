@@ -465,4 +465,127 @@ STATE_SOURCES = {
         "designating_authority": "Texas Historical Commission",
         "active": True,
     },
+    "NJ": {
+        "adapter": "arcgis",
+        "name": "New Jersey Historic Properties",
+        "endpoint": (
+            "https://mapsdep.nj.gov/arcgis/rest/services/"
+            "Features/Land/MapServer/55/query"
+        ),
+        "field_map": {
+            "name": ["NAME"],
+            "address": ["ADDRESS"],
+            "city": [],
+            "county": [],
+            "state_record_id": ["NJEMS_PIID"],
+            "date_constructed": [],
+            "nris_refnum": ["NRIS_ID"],
+            "date_listed": ["NRDATE"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "New Jersey HPO",
+        "active": True,
+    },
+    "MD": {
+        "adapter": "arcgis",
+        "name": "Maryland Inventory of Historic Properties",
+        "endpoint": (
+            "https://mdpgis.mdp.state.md.us/arcgis/rest/services/"
+            "MHT/Medusa/FeatureServer/3/query"
+        ),
+        "field_map": {
+            "name": ["NAMEHIST", "NAMEOTHER"],
+            "address": ["FULLADDR"],
+            "city": ["TOWN"],
+            "county": ["COUNTYNAME"],
+            "state_record_id": ["MIHPNO"],
+            "date_constructed": [],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Maryland Historical Trust",
+        "active": True,
+    },
+    "MD_NR": {
+        "adapter": "arcgis",
+        "state_code": "MD",
+        "name": "Maryland National Register of Historic Places",
+        "endpoint": (
+            "https://mdpgis.mdp.state.md.us/arcgis/rest/services/"
+            "MHT/Medusa/FeatureServer/1/query"
+        ),
+        "field_map": {
+            "name": ["NRNAME", "ALTNAME"],
+            "address": [],
+            "city": [],
+            "county": [],
+            "state_record_id": ["NATREGID"],
+            "date_constructed": [],
+            "nris_refnum": ["NRREFNO"],
+            "date_listed": ["LISTEDDATE"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register"],
+        "designating_authority": "Maryland Historical Trust",
+        "active": True,
+    },
+    "WA": {
+        "adapter": "arcgis",
+        "name": "Washington DAHP Register Properties",
+        "endpoint": (
+            "https://services6.arcgis.com/yIPFYZqx6a8IC4Hk/arcgis/rest/services/"
+            "DAHP_%E2%80%93_Register_Properties/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Comments"],
+            "address": ["STREET_ADD"],
+            "city": [],
+            "county": [],
+            "state_record_id": ["SITE_ID"],
+            "date_constructed": [],
+            "nris_refnum": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "Washington DAHP",
+        "active": True,
+    },
+    "HI": {
+        "adapter": "arcgis",
+        "name": "Hawaii NRHP Points",
+        "endpoint": (
+            "https://services3.arcgis.com/fsrDo0QMPlK9CkZD/arcgis/rest/services/"
+            "Hawaii_NRHP_Points/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["RESNAME"],
+            "address": [],
+            "city": [],
+            "county": [],
+            "state_record_id": ["CR_ID"],
+            "date_constructed": [],
+            "nris_refnum": ["NRIS_Refnum"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register"],
+        "designating_authority": "Hawaii SHPO",
+        "active": True,
+    },
 }

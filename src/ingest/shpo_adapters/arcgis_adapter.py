@@ -33,6 +33,28 @@ class ArcGISAdapter(SHPOAdapter):
                 return json.load(f)
 
         logger.info("[SHPO] %s: Fetching from %s", source_key, config["endpoint"])
+
+        pagination = config.get("pagination", "offset")
+        if pagination == "objectid":
+            all_features = self._fetch_by_objectid(config, source_key)
+        else:
+            all_features = self._fetch_by_offset(config, source_key)
+
+        # Cache raw response
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, "w") as f:
+            json.dump(all_features, f)
+        logger.info(
+            "[SHPO] %s: Cached %d records to %s",
+            source_key,
+            len(all_features),
+            cache_file,
+        )
+
+        return all_features
+
+    def _fetch_by_offset(self, config: dict, source_key: str) -> list[dict]:
+        """Standard resultOffset pagination."""
         all_features = []
         offset = 0
         page_size = config.get("page_size", 1000)
@@ -76,16 +98,71 @@ class ArcGISAdapter(SHPOAdapter):
 
             time.sleep(rate_limit)
 
-        # Cache raw response
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache_file, "w") as f:
-            json.dump(all_features, f)
-        logger.info(
-            "[SHPO] %s: Cached %d records to %s",
-            source_key,
-            len(all_features),
-            cache_file,
-        )
+        return all_features
+
+    def _fetch_by_objectid(self, config: dict, source_key: str) -> list[dict]:
+        """ObjectId-based pagination for servers that don't support resultOffset."""
+        page_size = config.get("page_size", 1000)
+        rate_limit = config.get("rate_limit", 0.5)
+        oid_field = config.get("oid_field", "OBJECTID")
+
+        # Step 1: Get all object IDs
+        logger.info("[SHPO] %s: Fetching object IDs...", source_key)
+        params = {
+            "where": config.get("where", "1=1"),
+            "returnIdsOnly": "true",
+            "f": "json",
+        }
+        response = requests.get(config["endpoint"], params=params, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+
+        if "error" in data:
+            raise RuntimeError(
+                f"[SHPO] {source_key}: ArcGIS API error: {data['error']}"
+            )
+
+        object_ids = sorted(data.get("objectIds", []))
+        if not object_ids:
+            logger.warning("[SHPO] %s: No object IDs returned", source_key)
+            return []
+
+        logger.info("[SHPO] %s: Found %d object IDs", source_key, len(object_ids))
+
+        # Step 2: Fetch in batches by ID range
+        all_features = []
+        for i in range(0, len(object_ids), page_size):
+            batch_ids = object_ids[i : i + page_size]
+            id_list = ",".join(str(oid) for oid in batch_ids)
+
+            params = {
+                "objectIds": id_list,
+                "outFields": "*",
+                "outSR": str(config.get("out_sr", 4326)),
+                "f": "json",
+                "returnGeometry": "true",
+            }
+
+            response = requests.get(config["endpoint"], params=params, timeout=60)
+            response.raise_for_status()
+            data = response.json()
+
+            if "error" in data:
+                raise RuntimeError(
+                    f"[SHPO] {source_key}: ArcGIS API error: {data['error']}"
+                )
+
+            features = data.get("features", [])
+            all_features.extend(features)
+            logger.info(
+                "[SHPO] %s: Fetched %d records (total: %d / %d)",
+                source_key,
+                len(features),
+                len(all_features),
+                len(object_ids),
+            )
+
+            time.sleep(rate_limit)
 
         return all_features
 
@@ -100,9 +177,18 @@ class ArcGISAdapter(SHPOAdapter):
             attrs = feature.get("attributes", {})
             geom = feature.get("geometry") or {}
 
-            # ArcGIS geometry: {"x": longitude, "y": latitude}
+            # ArcGIS geometry: points have {"x": lon, "y": lat}
+            # Polygons have {"rings": [[[x,y], ...], ...]}
             longitude = geom.get("x")
             latitude = geom.get("y")
+
+            if longitude is None or latitude is None:
+                # Try polygon centroid from rings
+                rings = geom.get("rings")
+                if rings and rings[0]:
+                    ring = rings[0]  # outer ring
+                    longitude = sum(p[0] for p in ring) / len(ring)
+                    latitude = sum(p[1] for p in ring) / len(ring)
 
             # Skip features with null geometry
             if longitude is None or latitude is None:
