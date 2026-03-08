@@ -126,6 +126,21 @@ def validate_coordinates(
         result["warnings"].append("missing_coordinates")
         return result
 
+    # Coerce strings to float; reject non-numeric values like "NaN"
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (TypeError, ValueError):
+        result["valid"] = False
+        result["warnings"].append(f"non_numeric_coordinates: {lat}, {lon}")
+        return result
+    import math
+    if math.isnan(lat) or math.isnan(lon):
+        result["valid"] = False
+        result["warnings"].append("nan_coordinates")
+        return result
+    result["lat"], result["lon"] = lat, lon
+
     # Check for swapped lat/lon
     if US_LON_MIN <= lat <= US_LON_MAX and US_LAT_MIN <= lon <= US_LAT_MAX:
         result["warnings"].append("swapped_lat_lon")

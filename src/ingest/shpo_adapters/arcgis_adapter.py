@@ -7,6 +7,7 @@ Each state's field names and endpoint are configured in config/state_sources.py.
 
 import json
 import logging
+import re
 import time
 
 import requests
@@ -36,6 +37,23 @@ _STATE_NAME_TO_CODE = {
     "VERMONT": "VT", "VIRGIN ISLANDS": "VI", "VIRGINIA": "VA",
     "WASHINGTON": "WA", "WEST VIRGINIA": "WV", "WISCONSIN": "WI",
     "WYOMING": "WY", "FED. STATES": "FM", "MARSHALL ISLANDS": "MH",
+}
+
+# Generic building-type names that should be skipped (too common to match reliably)
+_GENERIC_NAMES = {
+    "house", "barn", "church", "school", "bridge", "store", "shed",
+    "garage", "cabin", "mill", "office", "duplex", "outbuilding",
+    "outbldg", "cemetery", "log house", "frame house", "log cabin",
+    "commercial building", "commercial bldg", "frame building",
+    "brick house", "stone house", "tobacco barn", "frame barn",
+    "frame dwelling", "brick dwelling", "dwelling", "residence",
+    "multiple dwelling", "single dwelling", "residential",
+    "commercial", "industrial", "row houses", "row house",
+    "rural survey property", "rural survey properties",
+    "no name given", "no name property", "not named", "unnamed",
+    "unknown", "not determined", "farm", "apartment building",
+    "apartments", "single family", "multi-family", "business",
+    "gas station", "warehouse", "factory",
 }
 
 
@@ -218,6 +236,21 @@ class ArcGISAdapter(SHPOAdapter):
                     longitude = sum(p[0] for p in ring) / len(ring)
                     latitude = sum(p[1] for p in ring) / len(ring)
 
+            # Coerce to float and reject NaN
+            import math
+            try:
+                if longitude is not None:
+                    longitude = float(longitude)
+                if latitude is not None:
+                    latitude = float(latitude)
+            except (TypeError, ValueError):
+                longitude = latitude = None
+            if (
+                longitude is not None and latitude is not None
+                and (math.isnan(longitude) or math.isnan(latitude))
+            ):
+                longitude = latitude = None
+
             # Skip features with null geometry
             if longitude is None or latitude is None:
                 logger.debug(
@@ -230,6 +263,43 @@ class ArcGISAdapter(SHPOAdapter):
             if name:
                 # Strip invisible Unicode chars (zero-width spaces, etc.)
                 name = name.strip().strip("\u200b\u200c\u200d\ufeff")
+
+            # Strip configurable artifact patterns (e.g. KY's "#EL#")
+            if name and config.get("name_strip_patterns"):
+                for pattern in config["name_strip_patterns"]:
+                    name = name.replace(pattern, "")
+                name = re.sub(r"\s+", " ", name).strip()
+
+            # Multi-entry names: "Name1 (Historic), Name2 (Current)" → pick best
+            if name and config.get("name_multi_entry"):
+                # Split on "), " boundaries (end of annotation + comma)
+                parts = re.split(r"\)\s*,\s*", name)
+                # Prefer NRHP-annotated entry
+                chosen = None
+                for part in parts:
+                    if "NRHP" in part or "National Register" in part:
+                        chosen = re.sub(r"\s*\(.*", "", part).strip()
+                        break
+                if not chosen:
+                    # Take first entry, strip annotation
+                    chosen = re.sub(r"\s*\(.*", "", parts[0]).strip()
+                name = chosen if chosen else name
+
+            # Convert ALL CAPS to Title Case
+            if name and config.get("name_upper_to_title"):
+                if name == name.upper() and len(name) > 1:
+                    name = name.title()
+
+            # Skip generic building-type names
+            if name and config.get("skip_generic_names"):
+                name_lower = name.lower().strip()
+                # Exact match or generic with suffix like "- demolished"
+                base_name = re.split(r"\s*[-,(]\s*", name_lower)[0].strip()
+                if name_lower in _GENERIC_NAMES or base_name in _GENERIC_NAMES:
+                    logger.debug(
+                        "[SHPO] %s: Skipping generic name: %s", state_code, name
+                    )
+                    continue
 
             # Skip records with no name
             if not name:
@@ -245,8 +315,9 @@ class ArcGISAdapter(SHPOAdapter):
                 number = _get_attr(attrs, *parts.get("number", []))
                 direction = _get_attr(attrs, *parts.get("direction", []))
                 street = _get_attr(attrs, *parts.get("street", []))
+                suffix = _get_attr(attrs, *parts.get("suffix", []))
                 addr_components = [
-                    c for c in [number, direction, street] if c
+                    c for c in [number, direction, street, suffix] if c
                 ]
                 address = " ".join(addr_components) if addr_components else None
             elif field_map.get("address"):

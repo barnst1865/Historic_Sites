@@ -9,12 +9,14 @@ Usage:
     python scripts/run_ingest.py --source nominations   # Nomination PDFs
     python scripts/run_ingest.py --source shpo          # State SHPO sources
     python scripts/run_ingest.py --source shpo --states IN,MO  # Specific states
+    python scripts/run_ingest.py --source shpo --resume # Resume interrupted run
     python scripts/run_ingest.py --source all           # All active sources
 """
 
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 # Add project root to path
@@ -96,51 +98,141 @@ def ingest_nps_parks(conn, no_cache: bool = False):
     return stats
 
 
-def ingest_shpo(conn, states: list[str] | None = None, no_cache: bool = False):
-    """Ingest records from state SHPO data sources."""
+def _get_completed_shpo_sources(conn) -> set[str]:
+    """Return set of source keys that have completed ingest in pipeline_runs."""
+    rows = conn.execute(
+        "SELECT stage FROM pipeline_runs WHERE status = 'completed' "
+        "AND stage LIKE 'ingest_shpo_%'"
+    ).fetchall()
+    # stage format: 'ingest_shpo_VA' -> source key 'VA'
+    return {row[0].replace("ingest_shpo_", "") for row in rows}
+
+
+def ingest_shpo(
+    states: list[str] | None = None,
+    no_cache: bool = False,
+    resume: bool = False,
+):
+    """Ingest records from state SHPO data sources.
+
+    Each source gets its own DB connection and commits independently,
+    so a crash mid-run doesn't lose progress on completed sources.
+    Use --resume to skip sources that already completed successfully.
+    """
     from config.state_sources import STATE_SOURCES
+    from src.db.connection import get_connection
+    from src.db.queries import complete_pipeline_run, start_pipeline_run
 
     active = get_active_states(filter_states=states)
     if not active:
         logger.warning("No active SHPO states to ingest")
         return {}
 
-    logger.info("=== Ingesting SHPO: %s ===", ", ".join(active))
-    all_stats = {}
+    # Check what's already done (for resume)
+    completed = set()
+    if resume:
+        check_conn = get_connection()
+        completed = _get_completed_shpo_sources(check_conn)
+        check_conn.close()
+        if completed:
+            logger.info("Resume mode: %d sources already completed: %s",
+                        len(completed), ", ".join(sorted(completed)))
 
-    for source_key in active:
+    # Filter out completed sources
+    pending = [k for k in active if k not in completed]
+    if not pending:
+        logger.info("All %d sources already completed. Nothing to do.", len(active))
+        return {}
+
+    logger.info("=== Ingesting SHPO: %d sources [%s] ===",
+                len(pending), ", ".join(pending))
+    all_stats = {}
+    run_start = time.time()
+
+    for src_idx, source_key in enumerate(pending, 1):
+        source_start = time.time()
+        logger.info("--- [%d/%d] SHPO %s ---", src_idx, len(pending), source_key)
+
         try:
-            logger.info("--- SHPO %s ---", source_key)
             raw = fetch_state(source_key, use_cache=not no_cache)
             sites = parse_state(source_key, raw)
+            logger.info("SHPO %s: %d records parsed, starting merge...",
+                        source_key, len(sites))
 
             config = STATE_SOURCES[source_key]
 
-            if config.get("multi_state"):
-                # Group records by state and merge each group separately
-                from collections import defaultdict
-                by_state = defaultdict(list)
-                for s in sites:
-                    by_state[s.get("state", "XX")].append(s)
+            # Each source gets its own connection so commits are independent
+            conn = get_connection()
+            try:
+                if config.get("multi_state"):
+                    from collections import defaultdict
+                    by_state = defaultdict(list)
+                    for s in sites:
+                        by_state[s.get("state", "XX")].append(s)
 
-                combined = {"inserted": 0, "updated": 0, "matched_nris": 0,
-                            "matched_fuzzy": 0, "skipped": 0}
-                for st_code in sorted(by_state):
-                    st_sites = by_state[st_code]
-                    st_stats = merge_shpo_records(conn, st_sites, st_code, config)
-                    for k in combined:
-                        combined[k] += st_stats.get(k, 0)
-                    logger.info("SHPO %s/%s: %s", source_key, st_code, st_stats)
-                stats = combined
-            else:
-                real_state = config.get("state_code", source_key.split("_")[0])
-                stats = merge_shpo_records(conn, sites, real_state, config)
+                    combined = {"inserted": 0, "updated": 0, "matched_nris": 0,
+                                "matched_address": 0, "matched_fuzzy": 0, "skipped": 0}
+                    for st_code in sorted(by_state):
+                        st_sites = by_state[st_code]
+                        st_stats = merge_shpo_records(conn, st_sites, st_code, config)
+                        for k in combined:
+                            combined[k] += st_stats.get(k, 0)
+                        logger.info("SHPO %s/%s: %s", source_key, st_code, st_stats)
+                    stats = combined
+                else:
+                    real_state = config.get("state_code", source_key.split("_")[0])
+                    stats = merge_shpo_records(conn, sites, real_state, config)
 
+                conn.commit()
+
+                # Record completion for resume support
+                run_id = start_pipeline_run(conn, f"ingest_shpo_{source_key}")
+                total_processed = sum(v for k, v in stats.items() if k != "error")
+                complete_pipeline_run(conn, run_id, total_processed)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+            elapsed = time.time() - source_start
             all_stats[source_key] = stats
-            logger.info("SHPO %s merge: %s", source_key, stats)
+            logger.info(
+                "SHPO %s complete in %.1fs: %s",
+                source_key, elapsed, stats,
+            )
+
         except Exception:
-            logger.exception("SHPO %s failed — continuing with next source", source_key)
+            elapsed = time.time() - source_start
+            logger.exception(
+                "SHPO %s FAILED after %.1fs — continuing with next source",
+                source_key, elapsed,
+            )
             all_stats[source_key] = {"error": True}
+
+    # Final summary
+    total_elapsed = time.time() - run_start
+    total_inserted = sum(s.get("inserted", 0) for s in all_stats.values())
+    total_updated = sum(s.get("updated", 0) for s in all_stats.values())
+    total_matched = sum(
+        s.get("matched_nris", 0) + s.get("matched_address", 0) + s.get("matched_fuzzy", 0)
+        for s in all_stats.values()
+    )
+    errors = [k for k, v in all_stats.items() if v.get("error")]
+
+    logger.info("=" * 60)
+    logger.info(
+        "SHPO ingest complete: %d sources in %.1fs",
+        len(pending), total_elapsed,
+    )
+    logger.info(
+        "  Inserted: %d | Updated: %d | Matched: %d",
+        total_inserted, total_updated, total_matched,
+    )
+    if errors:
+        logger.warning("  Failed sources: %s", ", ".join(errors))
+    logger.info("=" * 60)
 
     return all_stats
 
@@ -162,6 +254,10 @@ def main():
         help="Comma-separated state codes for SHPO ingest (e.g., IN,MO,UT)",
     )
     parser.add_argument("--no-cache", action="store_true", help="Force fresh API fetch")
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="Skip SHPO sources that already completed successfully",
+    )
     args = parser.parse_args()
 
     # Ensure database exists
@@ -171,33 +267,37 @@ def main():
 
     state_list = args.states.split(",") if args.states else None
 
-    with db_connection() as conn:
-        if args.source == "arcgis":
-            ingest_arcgis(conn, no_cache=args.no_cache)
-        elif args.source == "spreadsheet":
-            ingest_spreadsheet(conn, filepath=args.file)
-        elif args.source == "nps_parks":
-            ingest_nps_parks(conn, no_cache=args.no_cache)
-        elif args.source == "shpo":
-            ingest_shpo(conn, states=state_list, no_cache=args.no_cache)
-        elif args.source == "nhl":
-            # NHL = spreadsheet first (authoritative), then ArcGIS overlay
-            ingest_spreadsheet(conn, filepath=args.file)
-            ingest_arcgis(conn, no_cache=args.no_cache)
-        elif args.source == "all":
-            ingest_spreadsheet(conn, filepath=args.file)
-            ingest_arcgis(conn, no_cache=args.no_cache)
-            ingest_nps_parks(conn, no_cache=args.no_cache)
-            ingest_shpo(conn, states=state_list, no_cache=args.no_cache)
-        elif args.source == "nominations":
-            logger.info("Nomination ingestion — see run_ingest.py --source nominations")
-            # Will be implemented in Phase 3
-        elif args.source == "nrhp":
-            logger.info("Full NRHP ingestion planned for Phase 9")
-        else:
-            logger.error("Unknown source: %s", args.source)
-            sys.exit(1)
+    if args.source == "shpo":
+        # SHPO manages its own connections per-source for resumability
+        ingest_shpo(states=state_list, no_cache=args.no_cache, resume=args.resume)
+    elif args.source in ("arcgis", "spreadsheet", "nps_parks", "nhl", "all",
+                          "nominations", "nrhp"):
+        with db_connection() as conn:
+            if args.source == "arcgis":
+                ingest_arcgis(conn, no_cache=args.no_cache)
+            elif args.source == "spreadsheet":
+                ingest_spreadsheet(conn, filepath=args.file)
+            elif args.source == "nps_parks":
+                ingest_nps_parks(conn, no_cache=args.no_cache)
+            elif args.source == "nhl":
+                ingest_spreadsheet(conn, filepath=args.file)
+                ingest_arcgis(conn, no_cache=args.no_cache)
+            elif args.source == "all":
+                ingest_spreadsheet(conn, filepath=args.file)
+                ingest_arcgis(conn, no_cache=args.no_cache)
+                ingest_nps_parks(conn, no_cache=args.no_cache)
+            elif args.source == "nominations":
+                logger.info("Nomination ingestion — see run_ingest.py --source nominations")
+            elif args.source == "nrhp":
+                logger.info("Full NRHP ingestion planned for Phase 9")
+        if args.source == "all":
+            ingest_shpo(states=state_list, no_cache=args.no_cache, resume=args.resume)
+    else:
+        logger.error("Unknown source: %s", args.source)
+        sys.exit(1)
 
+    # Final DB stats
+    with db_connection() as conn:
         total = conn.execute("SELECT COUNT(*) FROM sites").fetchone()[0]
         with_coords = conn.execute(
             "SELECT COUNT(*) FROM sites WHERE latitude IS NOT NULL"
