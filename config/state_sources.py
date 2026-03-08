@@ -588,6 +588,401 @@ STATE_SOURCES = {
         "designating_authority": "Hawaii SHPO",
         "active": True,
     },
+    # --- Maine ---
+    "ME": {
+        "adapter": "arcgis",
+        "state_code": "ME",
+        "name": "Maine CARMA Historic Properties",
+        "endpoint": (
+            "https://arcgisserver.maine.gov/arcgis/rest/services/"
+            "mdot/MaineDOT_Feature/MapServer/45/query"
+        ),
+        "field_map": {
+            "name": ["HISTPROP.HIST_PROP_FORM_V.PROPNAM_HIS", "HISTPROP.HIST_PROP_FORM_V.PROPNAME_OTH"],
+            "address": ["HISTPROP.HIST_PROP_FORM_V.ST_E911_PROP"],
+            "city": ["HISTPROP.HIST_PROP_FORM_V.TOWN"],
+            "county": ["HISTPROP.HIST_PROP_FORM_V.COUNTY"],
+            "state_record_id": ["HISTPROP.HIST_PROP_FORM_V.MHPC_INV_NUM"],
+            "date_constructed": ["HISTPROP.HIST_PROP_FORM_V.DATE_ESTCON"],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "pagination": "objectid",
+        "page_size": 100,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.3,
+        "designation_types": ["State Register"],
+        "designating_authority": "Maine Historic Preservation Commission",
+        "active": True,
+    },
+    # --- Washington DC ---
+    "DC": {
+        "adapter": "arcgis",
+        "state_code": "DC",
+        "name": "DC Historic Landmarks",
+        "endpoint": (
+            "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/"
+            "Planning_Landuse_and_Zoning_WebMercator/MapServer/22/query"
+        ),
+        "field_map": {
+            "name": ["NAME"],
+            "address": [],
+            "city": [],
+            "county": [],
+            "state_record_id": ["UNIQUEID"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": ["DESIGNATIONDATE"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["DC Landmark", "National Register"],
+        "designating_authority": "DC Historic Preservation Office",
+        "active": True,
+    },
+    # --- Delaware ---
+    "DE": {
+        "adapter": "arcgis",
+        "state_code": "DE",
+        "name": "Delaware Historic Markers",
+        "endpoint": (
+            "https://enterprise.firstmap.delaware.gov/arcgis/rest/services/"
+            "Society/DE_HistoricMarkers/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["MARKER_NAME"],
+            "address": ["STREET_ADDRESS"],
+            "city": ["CITY"],
+            "county": [],
+            "state_record_id": ["MARKER_NUMBER"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Historical Marker"],
+        "designating_authority": "Delaware SHPO",
+        "active": True,
+    },
+    # --- Kansas ---
+    "KS": {
+        "adapter": "arcgis",
+        "state_code": "KS",
+        "name": "Kansas KHRI Historic Resources Inventory",
+        "endpoint": (
+            "https://services.kgs.ku.edu/arcgis8/rest/services/"
+            "khri/khri/MapServer/4/query"
+        ),
+        "field_map": {
+            "name": ["HISTNAME"],
+            "address": ["SITUS_NUM", "SITUS_PR00", "SITUS_ST01", "SITUS_ST02"],
+            "city": ["SITUS_CI01"],
+            "county": [],
+            "state_record_id": ["INVENTOR00"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Kansas Historical Society",
+        "active": True,
+    },
+    # --- Michigan (markers only) ---
+    "MI": {
+        "adapter": "arcgis",
+        "state_code": "MI",
+        "name": "Michigan Historical Markers",
+        "endpoint": (
+            "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/ArcGIS/rest/services/"
+            "Historical_Markers_Public_View/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["markername"],
+            "address": ["markerlocationaddress"],
+            "city": ["markerlocationcity"],
+            "county": [],
+            "state_record_id": [],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Historical Marker"],
+        "designating_authority": "Michigan SHPO",
+        "active": True,
+    },
+    # --- Oklahoma ---
+    "OK": {
+        "adapter": "arcgis",
+        "state_code": "OK",
+        "name": "Oklahoma SHPO National Register Listed Sites",
+        "endpoint": (
+            "https://services.arcgis.com/nmcSvtJjWBnsYp7Y/arcgis/rest/services/"
+            "NR_LISTEDSITES/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Property_N"],
+            "address": [],
+            "city": ["City"],
+            "county": ["County"],
+            "state_record_id": [],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register"],
+        "designating_authority": "Oklahoma SHPO",
+        "active": True,
+    },
+    # --- Kentucky ---
+    "KY": {
+        "adapter": "arcgis",
+        "state_code": "KY",
+        "name": "Kentucky Heritage Council Historic Resources",
+        "endpoint": (
+            "https://services6.arcgis.com/enwYUUpKO0CdGERb/arcgis/rest/services/"
+            "KHCPublicGIS_view/FeatureServer/2/query"
+        ),
+        "field_map": {
+            "name": ["HName"],
+            "address": ["LOCATION"],
+            "city": ["TOWN"],
+            "county": [],
+            "state_record_id": ["SiteNo"],
+            "date_constructed": ["ConstYear"],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Kentucky Heritage Council",
+        "active": True,
+    },
+    # --- Louisiana ---
+    "LA": {
+        "adapter": "arcgis",
+        "state_code": "LA",
+        "name": "Louisiana NR Individual Listings",
+        "endpoint": (
+            "https://services6.arcgis.com/Pa9GX8gVoVoT9Dpj/arcgis/rest/services/"
+            "NR_Individual_Listings/FeatureServer/1/query"
+        ),
+        "field_map": {
+            "name": ["RESNAME"],
+            "address": ["Address_1"],
+            "city": ["City_1"],
+            "county": ["Parish_1"],
+            "state_record_id": [],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": ["DateonRe_1"],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register"],
+        "designating_authority": "Louisiana SHPO",
+        "active": True,
+    },
+    # --- Arkansas ---
+    "AR": {
+        "adapter": "arcgis",
+        "state_code": "AR",
+        "name": "Arkansas AHPP National Register and Survey Database",
+        "endpoint": (
+            "https://services2.arcgis.com/grRZsSQcS53444of/arcgis/rest/services/"
+            "AHPP_National_Register_and_Survey_Database/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["Historic_N"],
+            "address": ["House_Numb", "Dir", "Street_Nam", "Suffix"],
+            "city": ["Town"],
+            "county": ["County"],
+            "state_record_id": ["Resource__"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": ["NR_List_Da"],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "Arkansas AHPP",
+        "active": True,
+    },
+    # --- Illinois ---
+    "IL": {
+        "adapter": "arcgis",
+        "state_code": "IL",
+        "name": "Illinois IHPA HARGIS Properties",
+        "endpoint": (
+            "https://services.arcgis.com/b9DHj1BjfdLLFv11/arcgis/rest/services/"
+            "IHPA_HARGIS/FeatureServer/0/query"
+        ),
+        "field_map": {
+            "name": ["SignificantName"],
+            "address": ["Location"],
+            "city": ["City"],
+            "county": ["County"],
+            "state_record_id": ["RefNum"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Illinois IHPA",
+        "active": True,
+    },
+    # --- Pennsylvania ---
+    "PA": {
+        "adapter": "arcgis",
+        "state_code": "PA",
+        "name": "Pennsylvania SHPO Above Ground Resources (PA-SHARE)",
+        "endpoint": (
+            "https://utility.arcgis.com/usrsvcs/servers/"
+            "bb0205239d604bd88ff2d6620e8822fb/rest/services/"
+            "PASHAREMAPGUEST/MapServer/2/query"
+        ),
+        "field_map": {
+            "name": ["EntityName"],
+            "address": ["ResourceAddress"],
+            "city": [],
+            "county": [],
+            "state_record_id": ["EntityNum"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "Eligibility IN ('Listed','Eligible','NHL')",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "Pennsylvania SHPO",
+        "active": True,
+    },
+    # --- Virginia ---
+    "VA": {
+        "adapter": "arcgis",
+        "state_code": "VA",
+        "name": "Virginia DHR Architecture Points (named properties only)",
+        "endpoint": (
+            "https://vcris.dhr.virginia.gov/arcgis/rest/services/"
+            "dhr/dhr_public/MapServer/2/query"
+        ),
+        "field_map": {
+            "name": ["PropertyNames"],
+            "address": ["Addresses"],
+            "city": [],
+            "county": [],
+            "state_record_id": ["DHR_ID"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": (
+            "PropertyNames NOT LIKE 'House,%'"
+            " AND PropertyNames NOT LIKE 'Single Dwelling,%'"
+            " AND PropertyNames NOT LIKE 'Farm,%'"
+            " AND PropertyNames NOT LIKE 'Barn,%'"
+            " AND PropertyNames NOT LIKE 'Garage,%'"
+            " AND PropertyNames NOT LIKE 'Store,%'"
+            " AND PropertyNames NOT LIKE 'Church,%'"
+            " AND PropertyNames NOT LIKE 'Cemetery,%'"
+            " AND PropertyNames NOT LIKE 'Commercial building,%'"
+            " AND PropertyNames NOT LIKE 'School,%'"
+            " AND PropertyNames NOT LIKE 'Bridge,%'"
+            " AND PropertyNames NOT LIKE 'Shed,%'"
+            " AND PropertyNames NOT LIKE 'Office,%'"
+            " AND PropertyNames NOT LIKE 'Warehouse,%'"
+            " AND PropertyNames NOT LIKE 'Mill,%'"
+        ),
+        "rate_limit": 0.5,
+        "designation_types": ["State Register"],
+        "designating_authority": "Virginia DHR",
+        "active": True,
+    },
+    "VA_NR": {
+        "adapter": "arcgis",
+        "state_code": "VA",
+        "name": "Virginia VLR/NRHP/NHL Listed Properties",
+        "endpoint": (
+            "https://vcris.dhr.virginia.gov/arcgis/rest/services/"
+            "dhr/dhr_public/MapServer/3/query"
+        ),
+        "field_map": {
+            "name": ["PropertyNames"],
+            "address": [],
+            "city": [],
+            "county": [],
+            "state_record_id": ["DHR_ID"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": [],
+        },
+        "page_size": 1000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["National Register", "Virginia Landmarks Register"],
+        "designating_authority": "Virginia DHR",
+        "active": True,
+    },
+    # --- New York ---
+    "NY": {
+        "adapter": "arcgis",
+        "state_code": "NY",
+        "name": "New York SHPO National Register Listings",
+        "endpoint": (
+            "https://services.arcgis.com/1xFZPtKn1wKC6POA/ArcGIS/rest/services/"
+            "National_Register_Building_Listings/FeatureServer/13/query"
+        ),
+        "field_map": {
+            "name": ["HistoricName"],
+            "address": [],
+            "city": ["CityTown"],
+            "county": ["CountyName"],
+            "state_record_id": ["NRNum"],
+            "date_constructed": [],
+            "nris_refnum": [],
+            "date_listed": ["DateNR"],
+        },
+        "page_size": 2000,
+        "out_sr": 4326,
+        "where": "1=1",
+        "rate_limit": 0.5,
+        "designation_types": ["State Register", "National Register"],
+        "designating_authority": "New York SHPO",
+        "active": True,
+    },
     # --- California ---
     "CA_LA": {
         "adapter": "arcgis",

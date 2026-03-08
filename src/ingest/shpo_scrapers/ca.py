@@ -292,7 +292,11 @@ def _parse_listing_row(cells: list, county_id: int) -> dict | None:
 
 
 def _fetch_detail_page(session: requests.Session, refnum: str, source_key: str) -> dict:
-    """Fetch and parse a resource detail page."""
+    """Fetch and parse a resource detail page.
+
+    Page structure: <strong>Label:</strong> value<br> inside a col-md-12 div.
+    Uses get_text with newline separators and regex to extract fields.
+    """
     url = f"{DETAIL_URL}{refnum}"
     response = session.get(url, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
@@ -300,67 +304,47 @@ def _fetch_detail_page(session: requests.Session, refnum: str, source_key: str) 
     soup = BeautifulSoup(response.text, "html.parser")
     detail = {}
 
-    # Look for definition list or labeled fields
-    # Common patterns: "NPS Number:", "Location:", "Criterion:", etc.
-    text = soup.get_text()
+    # Get text with newline separators so fields don't run together
+    text = soup.get_text(separator="\n")
 
-    # Extract NPS Number (maps to nris_refnum)
-    nps_match = re.search(r"NPS\s*(?:Number|#|Ref)[:\s]+(\d{8})", text)
+    # Extract fields using regex on newline-separated text
+    nps_match = re.search(r"NPS\s*Number[:\s]+(\d{8})", text)
     if nps_match:
         detail["nps_number"] = nps_match.group(1)
 
-    # Extract location/address
-    loc_match = re.search(r"Location[:\s]+(.+?)(?:\n|Registration|Criterion|Year)", text)
-    if loc_match:
-        detail["address"] = loc_match.group(1).strip()
-
-    # Extract Registration Date
-    reg_match = re.search(r"Registration\s*Date[:\s]+(.+?)(?:\n|Criterion|Year|Architect)", text)
+    reg_match = re.search(r"Registration\s*Date[:\s]+(.+)", text)
     if reg_match:
         detail["registration_date"] = reg_match.group(1).strip()
 
-    # Extract Criterion
-    crit_match = re.search(r"Criteri(?:on|a)[:\s]+(.+?)(?:\n|Architect|Year|Location)", text)
+    # Location is the city (follows "Location:" on the next line)
+    loc_match = re.search(r"Location:\s*\n\s*(.+)", text)
+    if loc_match:
+        detail["location_city"] = loc_match.group(1).strip()
+
+    # County follows "County:" label
+    county_match = re.search(r"County:\s*(.+)", text)
+    if county_match:
+        detail["detail_county"] = county_match.group(1).strip()
+
+    # Directions field contains the actual street address
+    dir_match = re.search(r"Directions:\s*\n\s*(.+)", text)
+    if dir_match:
+        detail["address"] = dir_match.group(1).strip()
+
+    # Criterion/Criteria
+    crit_match = re.search(r"Criteri(?:on|a)[:\s]+(.+)", text)
     if crit_match:
         detail["criteria"] = crit_match.group(1).strip()
 
-    # Extract Architect
-    arch_match = re.search(r"Architect[:\s]+(.+?)(?:\n|Year|$)", text)
+    # Architect
+    arch_match = re.search(r"Architect[:\s]+(.+)", text)
     if arch_match:
         detail["architect"] = arch_match.group(1).strip()
 
-    # Extract Year Built
+    # Year Built
     year_match = re.search(r"Year\s*(?:Built)?[:\s]+(\d{4})", text)
     if year_match:
         detail["year_built"] = year_match.group(1)
-
-    # Try structured approach — look for dl/dt/dd or table-based layout
-    for dt in soup.find_all(["dt", "th", "label", "strong", "b"]):
-        label = dt.get_text(strip=True).rstrip(":").lower()
-        # Get the next sibling with content
-        sibling = dt.find_next_sibling(["dd", "td", "span"])
-        if not sibling:
-            continue
-        value = sibling.get_text(strip=True)
-        if not value:
-            continue
-
-        if "nps" in label and "number" in label:
-            nps = re.search(r"\d{8}", value)
-            if nps:
-                detail["nps_number"] = nps.group()
-        elif "location" in label or "address" in label:
-            detail["address"] = value
-        elif "registration" in label and "date" in label:
-            detail["registration_date"] = value
-        elif "criteri" in label:
-            detail["criteria"] = value
-        elif "architect" in label:
-            detail["architect"] = value
-        elif "year" in label:
-            year = re.search(r"\d{4}", value)
-            if year:
-                detail["year_built"] = year.group()
 
     return detail
 
@@ -390,15 +374,21 @@ def parse(raw_data: list[dict], config: dict) -> list[dict]:
             "primary_source": f"shpo_{source_key.lower()}",
         }
 
-        # Address from detail page
+        # Address from detail page (Directions field)
         if record.get("address"):
             site["address"] = record["address"]
 
-        # City and county from listing
+        # City: prefer listing page, fall back to detail page location_city
         if record.get("city"):
             site["city"] = record["city"]
+        elif record.get("location_city"):
+            site["city"] = record["location_city"]
+
+        # County: prefer listing page, fall back to detail page
         if record.get("county"):
             site["county"] = record["county"]
+        elif record.get("detail_county"):
+            site["county"] = record["detail_county"]
 
         # NPS number maps to nris_refnum for NRHP matching
         if record.get("nps_number"):

@@ -204,6 +204,13 @@ class ArcGISAdapter(SHPOAdapter):
             latitude = geom.get("y")
 
             if longitude is None or latitude is None:
+                # Try multipoint: {"points": [[x,y], ...]}
+                points = geom.get("points")
+                if points and points[0]:
+                    longitude = points[0][0]
+                    latitude = points[0][1]
+
+            if longitude is None or latitude is None:
                 # Try polygon centroid from rings
                 rings = geom.get("rings")
                 if rings and rings[0]:
